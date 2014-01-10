@@ -8,10 +8,12 @@ import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.MapView;
 import com.google.android.gms.maps.MapsInitializer;
 import com.google.android.gms.maps.UiSettings;
+import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.PolylineOptions;
 import mobi.droid.fakeroad.R;
+import mobi.droid.fakeroad.location.MapsHelper;
 
 import java.util.LinkedList;
 
@@ -20,6 +22,8 @@ public class MainActivity extends Activity{
     private MapView mMapView;
     private GoogleMap mMap;
     private LinkedList<LatLng> mMarkers = new LinkedList<LatLng>();
+    private final LinkedList<PolylineOptions> mPolylines = new LinkedList<PolylineOptions>();
+
     private void assignViews(){
         mMapView = (MapView) findViewById(R.id.mapView);
     }
@@ -49,10 +53,12 @@ public class MainActivity extends Activity{
 
                 @Override
                 public void onMapLongClick(final LatLng aLatLng){
-                    MarkerOptions options = new MarkerOptions();
-                    options.position(aLatLng);
-                    options.visible(true);
-                    mMap.addMarker(options);
+                    MarkerOptions pointMarker = new MarkerOptions();
+                    pointMarker.draggable(false);
+                    pointMarker.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_ORANGE));
+                    pointMarker.position(aLatLng);
+                    pointMarker.visible(true);
+                    mMap.addMarker(pointMarker);
 
                     if(!mMarkers.isEmpty()){
                         LatLng last = mMarkers.getLast();
@@ -60,9 +66,24 @@ public class MainActivity extends Activity{
                         PolylineOptions polylineOptions = new PolylineOptions();
                         polylineOptions.add(last, aLatLng);
                         polylineOptions.width(5);
+                        mPolylines.addLast(polylineOptions);
                         mMap.addPolyline(polylineOptions);
                     }
+                    LatLng oldLast = mMarkers.peekLast();
                     mMarkers.add(aLatLng);
+                    if(mMarkers.size() > 1){
+                        MarkerOptions distanceMarker = new MarkerOptions();
+                        int distance = (int) MapsHelper.distance(oldLast, aLatLng) / 2;
+                        distanceMarker.position(MapsHelper.calcLngLat(oldLast, distance, MapsHelper.bearing(oldLast, aLatLng)));
+                        distanceMarker.draggable(false);
+                        distanceMarker.visible(true);
+
+                        // TODO use https://github.com/googlemaps/android-maps-utils to generate icons with text
+
+                        distanceMarker.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE));
+                        distanceMarker.title(String.valueOf(distance) + "m");
+                        mMap.addMarker(distanceMarker);
+                    }
                 }
             });
         } catch(GooglePlayServicesNotAvailableException e){

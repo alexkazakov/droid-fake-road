@@ -5,6 +5,7 @@ import android.location.Address;
 import android.location.Geocoder;
 import android.location.Location;
 import android.util.Log;
+import android.util.Pair;
 import android.widget.TextView;
 import android.widget.Toast;
 import com.google.android.gms.maps.MapView;
@@ -14,11 +15,11 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.URL;
 import java.net.URLConnection;
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.List;
+import java.util.*;
 
 public class MapsHelper{
+
+    public static final int EARTH_RADIUS = 6371000;
 
     /**
      * Calculate the bearing between two points.
@@ -29,8 +30,8 @@ public class MapsHelper{
      */
     public static float bearing(LatLng p1, LatLng p2){
         float[] result = new float[2];
-        Location.distanceBetween(p1.latitude / 1000000.0, p1.longitude / 1000000.0,
-                                 p2.latitude / 1000000.0, p2.longitude / 1000000.0, result);
+        Location.distanceBetween(p1.latitude, p1.longitude,
+                                 p2.latitude, p2.longitude, result);
         return result[1];
     }
 
@@ -43,9 +44,24 @@ public class MapsHelper{
      */
     public static double distance(LatLng p1, LatLng p2){
         float[] result = new float[1];
-        Location.distanceBetween(p1.latitude / 1000000.0, p1.longitude / 1000000.0,
-                                 p2.latitude / 1000000.0, p2.longitude / 1000000.0, result);
+        Location.distanceBetween(p1.latitude, p1.longitude,
+                                 p2.latitude, p2.longitude, result);
         return result[0];
+    }
+
+    public static double distance(double lat_a, double lng_a, double lat_b, double lng_b){
+        double earthRadius = 3958.75;
+        double latDiff = Math.toRadians(lat_b - lat_a);
+        double lngDiff = Math.toRadians(lng_b - lng_a);
+        double a = Math.sin(latDiff / 2) * Math.sin(latDiff / 2) +
+                Math.cos(Math.toRadians(lat_a)) * Math.cos(Math.toRadians(lat_b)) *
+                        Math.sin(lngDiff / 2) * Math.sin(lngDiff / 2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        double distance = earthRadius * c;
+
+        int meterConversion = 1609;
+
+        return distance * meterConversion;
     }
 
     /**
@@ -256,5 +272,99 @@ public class MapsHelper{
             LatLngs.add(p);
         }
         return LatLngs;
+    }
+
+    public static LinkedList<LatLng> calculatePathBasedOnSpeed(final int aSpeed, final LatLng[] aPoints){
+        double fullPathMeters = distance(Arrays.asList(aPoints));
+        if(aSpeed < 1){
+            throw new IllegalArgumentException("Speed must be > 1 m/s");
+        }
+
+        int pointCount = (int) (fullPathMeters / aSpeed) + 1;
+        if(pointCount < 2){
+            pointCount = 2;
+        }
+
+        LinkedList<LatLng> points = new LinkedList<LatLng>();
+
+        addPoint(points, aPoints[0]);
+        if(pointCount == 2){
+            addPoint(points, aPoints[aPoints.length - 1]);
+        } else{
+            Pair<LatLng, LatLng> lastPoint = Pair.create(aPoints[0], aPoints[0]);
+            while(lastPoint.first != aPoints[aPoints.length - 1]){
+                lastPoint = nextLatLng(lastPoint, points, aPoints, aSpeed);
+            }
+        }
+        return points;
+    }
+
+    private static void addPoint(final LinkedList<LatLng> aPoints, final LatLng aPoint){
+        aPoints.addLast(aPoint);
+        Log.v("mobi.droid.fakeroad", "Added [" + aPoints.size() + "] location: " + aPoint);
+    }
+
+    private static Pair<LatLng, LatLng> nextLatLng(final Pair<LatLng, LatLng> aLastPoint,
+                                                   final LinkedList<LatLng> aResultPoints,
+                                                   final LatLng[] aSourcePoints,
+                                                   final int aDistance){
+        int totalDistance = aDistance;
+        int startIndex = -1;
+        for(LatLng l: aSourcePoints){
+            startIndex++;
+            if(l.equals(aLastPoint.first)){
+                break;
+            }
+        }
+        for(int i = startIndex; i < aSourcePoints.length - 1; i++){
+            LatLng p1;
+            if(i == startIndex){
+                p1 = aLastPoint.second;
+            } else{
+                p1 = aSourcePoints[i];
+            }
+            LatLng p2 = aSourcePoints[i + 1];
+
+            double distance = distance(p1, p2);
+            if(distance < totalDistance){
+                totalDistance -= distance; // skip to next points
+            } else{
+                LatLng point = calcLngLat(p1, totalDistance, MapsHelper.bearing(p1, p2));
+                addPoint(aResultPoints, point);
+                return Pair.create(aSourcePoints[i], point);
+            }
+        }
+        LatLng sourcePoint = aSourcePoints[aSourcePoints.length - 1];
+        addPoint(aResultPoints, sourcePoint);
+        return Pair.create(sourcePoint, sourcePoint);
+    }
+
+    public static LatLng calcLngLat(final LatLng aStart, int distance, final float bearing){
+        if(distance == 0){
+            return new LatLng(aStart.latitude, aStart.longitude);
+        }
+        double R = 6378100; // meters , earth Radius approx
+        double PI = 3.1415926535;
+        double RADIANS = PI / 180;
+        double DEGREES = 180 / PI;
+
+        double lat2;
+        double lon2;
+
+        double lat1 = aStart.latitude * RADIANS;
+        double lon1 = aStart.longitude * RADIANS;
+        double radbear = bearing * RADIANS;
+
+        lat2 = Math.asin(Math.sin(lat1) * Math.cos((double) distance / R) +
+                                 Math.cos(lat1) * Math.sin((double) distance / R) * Math.cos(radbear));
+        lon2 = lon1 + Math.atan2(Math.sin(radbear) * Math.sin((double) distance / R) * Math.cos(lat1),
+                                 Math.cos((double) distance / R) - Math.sin(lat1) * Math.sin(lat2));
+
+        return new LatLng(lat2 * DEGREES, lon2 * DEGREES);
+    }
+
+    public static LinkedList<LatLng> calculatePathBasedOnTime(final long aTime, final LatLng[] aPoints){
+        // TODO AK calculatePathBasedOnTime
+        return new LinkedList<LatLng>();
     }
 }
