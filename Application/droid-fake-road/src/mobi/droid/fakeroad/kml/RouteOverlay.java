@@ -1,14 +1,8 @@
 package mobi.droid.fakeroad.kml;
 
-import android.graphics.*;
-import com.google.android.maps.GeoPoint;
-import com.google.android.maps.MapView;
-import com.google.android.maps.Overlay;
-import com.google.android.maps.Projection;
+public class RouteOverlay { //extends Overlay
 
-public class RouteOverlay extends Overlay{
-
-    private static final int RADIUS = 6;
+/*    private static final int RADIUS = 6;
     public static final int LINE_ALPHA = 120;
     public static final int LINE_WIDTH = 5;
 
@@ -91,5 +85,5 @@ public class RouteOverlay extends Overlay{
         START_POINT,
         PATH,
         END_POINT
-    }
+    }*/
 }

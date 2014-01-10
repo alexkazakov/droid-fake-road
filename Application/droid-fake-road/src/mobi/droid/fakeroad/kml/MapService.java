@@ -1,9 +1,6 @@
 package mobi.droid.fakeroad.kml;
 
-import android.graphics.Color;
 import android.util.Log;
-import com.google.android.maps.GeoPoint;
-import com.google.android.maps.MapView;
 import org.xml.sax.InputSource;
 import org.xml.sax.XMLReader;
 
@@ -11,9 +8,6 @@ import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 import java.net.URL;
 import java.net.URLConnection;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Iterator;
 
 public class MapService{
 
@@ -85,14 +79,14 @@ public class MapService{
         return navigationDataSet;
     }
 
-    /**
+ /*   *//**
      * Does the actual drawing of the route, based on the geo points provided in the nav set
      *
      * @param navSet Navigation set bean that holds the route information, incl. geo pos
      * @param color Color in which to draw the lines
      * @param mMapView01 Map view to draw onto
-     */
-    public static void drawPath(NavigationDataSet navSet, int color, MapView mMapView01){
+     *//*
+    public static void drawPath(NavigationDataSet navSet, int color, MapFragment mMapView01){
 
         Log.d(TAG, "map color before: " + color);
 
@@ -103,7 +97,7 @@ public class MapService{
         Log.d(TAG, "map color after: " + color);
 
         Collection overlaysToAddAgain = new ArrayList();
-        for(Iterator iter = mMapView01.getOverlays().iterator(); iter.hasNext(); ){
+        for(Iterator iter = mMapView01.getMap().iterator(); iter.hasNext(); ){
             Object o = iter.next();
             Log.d(TAG, "overlay type: " + o.getClass().getName());
             if(!RouteOverlay.class.getName().equals(o.getClass().getName())){
@@ -166,5 +160,5 @@ public class MapService{
         // mMapView01.getOverlays().addAll(routeOverlays); // use the default color
         mMapView01.setEnabled(true);
     }
-
+*/
 }
