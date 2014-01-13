@@ -18,8 +18,7 @@ import mobi.droid.fakeroad.ui.view.AutoCompleteAddressTextView;
  */
 public class SearchLocationFragment extends Fragment implements View.OnClickListener{
 
-    MainActivity mMainActivity;
-    private AutoCompleteAddressTextView mEdtFrom;
+    private MainActivity mMainActivity;
     private Address mFrom;
     private Address mTo;
 
@@ -30,17 +29,13 @@ public class SearchLocationFragment extends Fragment implements View.OnClickList
     }
 
     @Override
-    public void onDetach(){
-        super.onDetach();
-    }
-
-    @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState){
         View inflate = inflater.inflate(R.layout.search_location_fragment, container, false);
 
+        //noinspection ConstantConditions
         inflate.findViewById(R.id.btnSearchFrom).setOnClickListener(this);
-        mEdtFrom = (AutoCompleteAddressTextView) inflate.findViewById(R.id.edtFrom);
-        mEdtFrom.setOnItemClickListener(new AdapterView.OnItemClickListener(){
+        AutoCompleteAddressTextView edtFrom = (AutoCompleteAddressTextView) inflate.findViewById(R.id.edtFrom);
+        edtFrom.setOnItemClickListener(new AdapterView.OnItemClickListener(){
 
             @Override
             public void onItemClick(final AdapterView<?> parent, final View view, final int position, final long id){
@@ -48,8 +43,8 @@ public class SearchLocationFragment extends Fragment implements View.OnClickList
                 mFrom = (Address) parent.getItemAtPosition(position);
                 if(mFrom != null){
                     mMainActivity.addMarkerStart(new LatLng(mFrom.getLatitude(), mFrom.getLongitude()));
+                    calculateRoute();
                 }
-                calculateRoute();
             }
         });
 
@@ -61,8 +56,8 @@ public class SearchLocationFragment extends Fragment implements View.OnClickList
                 mTo = (Address) parent.getItemAtPosition(position);
                 if(mTo != null){
                     mMainActivity.addMarkerEnd(new LatLng(mTo.getLatitude(), mTo.getLongitude()));
+                    calculateRoute();
                 }
-                calculateRoute();
             }
         });
         return inflate;
@@ -72,16 +67,14 @@ public class SearchLocationFragment extends Fragment implements View.OnClickList
     public void onClick(final View v){
         switch(v.getId()){
             case R.id.btnSearchFrom:
-
                 break;
             case R.id.btnSearchTo:
-
                 break;
         }
     }
 
     private void calculateRoute(){
-        if(mFrom != null && mTo != null){
+        if(mTo != null && mFrom != null){
             mMainActivity.calculateRoute(new LatLng(mFrom.getLatitude(), mFrom.getLongitude()),
                                          new LatLng(mTo.getLatitude(), mTo.getLongitude()));
         }

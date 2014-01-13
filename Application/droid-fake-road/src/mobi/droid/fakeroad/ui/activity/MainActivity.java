@@ -1,21 +1,14 @@
 package mobi.droid.fakeroad.ui.activity;
 
-import android.app.*;
-import android.content.DialogInterface;
-import android.content.Intent;
+import android.app.ProgressDialog;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
-import android.provider.Settings;
-import android.view.Menu;
-import android.view.MenuInflater;
-import android.view.MenuItem;
 import android.widget.Toast;
-import com.directions.route.Routing;
 import com.directions.route.RoutingListener;
-import com.google.android.gms.common.GooglePlayServicesNotAvailableException;
-import com.google.android.gms.maps.*;
+import com.google.android.gms.maps.CameraUpdateFactory;
+import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
@@ -23,249 +16,148 @@ import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.maps.android.ui.IconGenerator;
 import mobi.droid.fakeroad.R;
 import mobi.droid.fakeroad.location.MapsHelper;
-import mobi.droid.fakeroad.ui.fragments.SearchLocationFragment;
 
-import java.util.LinkedList;
+public class MainActivity extends BaseMapViewActivity{
 
-public class MainActivity extends Activity{
-
-    private final LinkedList<PolylineOptions> mPolylines = new LinkedList<PolylineOptions>();
-    private MapView mMapView;
-    private GoogleMap mMap;
-    private LinkedList<LatLng> mMarkers = new LinkedList<LatLng>();
     private IconGenerator mIconGenerator;
-
-    private void assignViews(){
-        mMapView = (MapView) findViewById(R.id.mapView);
-    }
+    private MarkerOptions mRouteStartMarkerOptions;
+    private MarkerOptions mRouteEndMarkerOptions;
+    private ProgressDialog mProgressDialog;
 
     @Override
-    public void onCreate(Bundle savedInstanceState){
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.main);
-
-        assignViews();
+    protected void configureMap(final Bundle savedInstanceState){
+        super.configureMap(savedInstanceState);
 
         mIconGenerator = new IconGenerator(this);
         mIconGenerator.setBackground(new ColorDrawable(Color.LTGRAY));
         mIconGenerator.setContentPadding(2, 2, 2, 2);
 
-        mMapView.onCreate(savedInstanceState);
-        mMapView.onResume();//needed to get the map to display immediately
-
-        try{
-            MapsInitializer.initialize(this);
-            mMap = mMapView.getMap();
-            mMap.setMyLocationEnabled(true);
-            UiSettings uiSettings = mMap.getUiSettings();
-            uiSettings.setAllGesturesEnabled(true);
-            uiSettings.setCompassEnabled(true);
-            uiSettings.setZoomControlsEnabled(true);
-            uiSettings.setMyLocationButtonEnabled(true);
-            mMap.setTrafficEnabled(false);
-
+        if(mMap != null){
             mMap.setOnMapLongClickListener(new GoogleMap.OnMapLongClickListener(){
 
                 @Override
                 public void onMapLongClick(final LatLng aLatLng){
-                    MarkerOptions pointMarker = new MarkerOptions();
-                    pointMarker.draggable(false);
-                    pointMarker.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_ORANGE));
-                    pointMarker.position(aLatLng);
-                    pointMarker.visible(true);
-                    mMap.addMarker(pointMarker);
-
-                    if(!mMarkers.isEmpty()){
-                        LatLng last = mMarkers.getLast();
-
-                        PolylineOptions polylineOptions = new PolylineOptions();
-                        polylineOptions.add(last, aLatLng);
-                        polylineOptions.width(5);
-                        mPolylines.addLast(polylineOptions);
-                        mMap.addPolyline(polylineOptions);
-                    }
-                    LatLng oldLast = mMarkers.peekLast();
-                    mMarkers.add(aLatLng);
-                    if(mMarkers.size() > 1){
-                        MarkerOptions distanceMarker = new MarkerOptions();
-                        int distance = (int) MapsHelper.distance(oldLast, aLatLng) / 2;
-                        distanceMarker.position(
-                                MapsHelper.calcLngLat(oldLast, distance, MapsHelper.bearing(oldLast, aLatLng)));
-                        distanceMarker.draggable(false);
-                        distanceMarker.visible(true);
-
-                        // TODO use https://github.com/googlemaps/android-maps-utils to generate icons with text
-                        Bitmap icon;
-                        if(distance < 1000){
-                            icon = mIconGenerator.makeIcon(String.valueOf(distance) + " m");
-                        } else{
-                            icon = mIconGenerator.makeIcon(
-                                    String.valueOf(distance / 1000) + "." + String.valueOf(distance % 1000) + " km");
-                        }
-                        distanceMarker.icon(BitmapDescriptorFactory.fromBitmap(icon));
-                        mMap.addMarker(distanceMarker);
-                    }
+                    onAddMarker(aLatLng);
                 }
             });
-
-        } catch(GooglePlayServicesNotAvailableException e){
-            e.printStackTrace();
-            Toast.makeText(this, e.getMessage(), Toast.LENGTH_LONG).show();
         }
     }
 
-    public void calculateRoute(final LatLng aStart, final LatLng aEnd){
+    @Override
+    protected void onAddMarker(final LatLng aLatLng){
+        MarkerOptions pointMarker = new MarkerOptions();
+        pointMarker.draggable(false);
+        pointMarker.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_ORANGE));
+        pointMarker.position(aLatLng);
+        pointMarker.visible(true);
+        mMap.addMarker(pointMarker);
 
-        Routing routing = new Routing(Routing.TravelMode.DRIVING);
-        routing.registerListener(new RoutingListener(){
+        if(!mMarkers.isEmpty()){
+            LatLng last = mMarkers.getLast();
 
-            @Override
-            public void onRoutingFailure(){
-                int i = 0;
-            }
+            PolylineOptions polylineOptions = new PolylineOptions();
+            polylineOptions.add(last, aLatLng);
+            polylineOptions.width(5);
+            mMap.addPolyline(polylineOptions);
+        }
+        LatLng oldLast = mMarkers.peekLast();
+        mMarkers.add(aLatLng);
+        if(mMarkers.size() > 1){
+            MarkerOptions distanceMarker = new MarkerOptions();
+            int distance = (int) MapsHelper.distance(oldLast, aLatLng) / 2;
+            distanceMarker.position(MapsHelper.calcLngLat(oldLast, distance, MapsHelper.bearing(oldLast, aLatLng)));
+            distanceMarker.draggable(false);
+            distanceMarker.visible(true);
 
-            @Override
-            public void onRoutingStart(){
-                int i = 0;
-            }
-
-            @Override
-            public void onRoutingSuccess(final PolylineOptions mPolyOptions){
-                mMap.clear();
-
-                PolylineOptions polylineOptions = new PolylineOptions();
-                polylineOptions.color(Color.BLUE);
-                polylineOptions.width(10);
-                polylineOptions.addAll(mPolyOptions.getPoints());
-
-                mMap.addPolyline(polylineOptions);
-
-                addMarkerStart(aStart);
-                addMarkerEnd(aEnd);
-            }
-        });
-        routing.execute(aStart, aEnd);
-        mMap.clear();
+            String text = distance < 1000 ?
+                    String.valueOf(distance) + " m" :
+                    String.valueOf(distance / 1000) + "." + String.valueOf(distance % 1000) + " km";
+            Bitmap icon = mIconGenerator.makeIcon(text);
+            distanceMarker.icon(BitmapDescriptorFactory.fromBitmap(icon));
+            mMap.addMarker(distanceMarker);
+        }
     }
 
     public void addMarkerStart(LatLng aLatLng){
         // Start marker
-        MarkerOptions options = new MarkerOptions();
-        options.position(aLatLng);
-        options.icon(BitmapDescriptorFactory.fromResource(R.drawable.start_blue));
-        mMap.addMarker(options);
-        mMap.moveCamera(CameraUpdateFactory.newLatLng(aLatLng));
+        if(mRouteStartMarkerOptions != null){
+            mRouteStartMarkerOptions.visible(false);
+        }
+        mRouteStartMarkerOptions = new MarkerOptions();
+        mRouteStartMarkerOptions.position(aLatLng);
+        mRouteStartMarkerOptions.icon(BitmapDescriptorFactory.fromResource(R.drawable.start_blue));
 
+        mMap.addMarker(mRouteStartMarkerOptions);
+        mMap.moveCamera(CameraUpdateFactory.newLatLng(aLatLng));
     }
 
     public void addMarkerEnd(LatLng aLatLng){
         // End marker
-        MarkerOptions options = new MarkerOptions();
-        options.position(aLatLng);
-        options.icon(BitmapDescriptorFactory.fromResource(R.drawable.end_green));
-        mMap.addMarker(options);
+        if(mRouteEndMarkerOptions != null){
+            mRouteEndMarkerOptions.visible(false);
+        }
+        mRouteEndMarkerOptions = new MarkerOptions();
+        mRouteEndMarkerOptions.position(aLatLng);
+        mRouteEndMarkerOptions.icon(BitmapDescriptorFactory.fromResource(R.drawable.end_green));
+
+        mMap.addMarker(mRouteEndMarkerOptions);
         mMap.moveCamera(CameraUpdateFactory.newLatLng(aLatLng));
     }
 
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu){
-        MenuInflater inflater = getMenuInflater();
-        inflater.inflate(R.menu.main_menu, menu);
-        return true;
-    }
+    public void calculateRoute(final LatLng aFrom, final LatLng aTo){
+        MapsHelper.calculateRoute(aFrom, aTo, new RoutingListener(){
 
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item){
-        // Handle item selection
-        switch(item.getItemId()){
-            case R.id.new_route:
-                pushFragment(SearchLocationFragment.class, null, R.id.fragmentHeader);
-                return true;
-            default:
-                return super.onOptionsItemSelected(item);
-        }
-    }
+            @Override
+            public void onRoutingFailure(){
+                hideProgress();
+                Toast.makeText(MainActivity.this, "Failed to determine routing", Toast.LENGTH_SHORT).show();
+            }
 
-    protected void pushFragment(Class<? extends Fragment> cls, Bundle args, final int rootID){
-        FragmentManager manager = getFragmentManager();
-        FragmentTransaction tr = manager.beginTransaction();
+            @Override
+            public void onRoutingStart(){
+                mProgressDialog = ProgressDialog.show(MainActivity.this, null, "Routing calculation...", true);
+            }
 
-        if(manager.findFragmentByTag(cls.getName()) == null){
-            tr.setCustomAnimations(android.R.animator.fade_in, android.R.animator.fade_out);
-            tr.replace(rootID, Fragment.instantiate(this, cls.getName(), args), cls.getName());
-            tr.commitAllowingStateLoss();
-        }
-    }
+            @Override
+            public void onRoutingSuccess(final PolylineOptions mPolyOptions){
+                hideProgress();
+                if(mMap != null){
+                    mMap.clear();
 
-    @Override
-    public void onDestroy(){
-        if(mMapView != null){
-            mMapView.onDestroy();
-        }
-        super.onDestroy();
-    }
+                    // Start marker
+                    MarkerOptions options = new MarkerOptions();
+                    options.position(aFrom);
+                    options.icon(BitmapDescriptorFactory.fromResource(R.drawable.start_blue));
+                    mMap.addMarker(options);
 
-    @Override
-    public void onLowMemory(){
-        super.onLowMemory();
-        if(mMapView != null){
-            mMapView.onLowMemory();
-        }
-    }
+                    // End marker
+                    options.position(aTo);
+                    options.icon(BitmapDescriptorFactory.fromResource(R.drawable.end_green));
+                    mMap.addMarker(options);
+                    mMap.moveCamera(CameraUpdateFactory.newLatLng(aTo));
 
-    @Override
-    public void onResume(){
-        super.onResume();
-        if(mMapView != null){
-            mMapView.onResume();
-        }
-        checkIfMockEnabled();
+                    PolylineOptions polylineOptions = new PolylineOptions();
+                    polylineOptions.color(Color.BLUE);
+                    polylineOptions.width(10);
+                    polylineOptions.addAll(mPolyOptions.getPoints());
+
+                    mMap.addPolyline(polylineOptions);
+                }
+            }
+        });
     }
 
     @Override
     public void onPause(){
+        hideProgress();
         super.onPause();
-        if(mMapView != null){
-            mMapView.onPause();
-        }
     }
 
-    @Override
-    public void onSaveInstanceState(final Bundle outState){
-        super.onSaveInstanceState(outState);
-        if(mMapView != null){
-            mMapView.onSaveInstanceState(outState);
-        }
-    }
-
-    private void checkIfMockEnabled(){
+    private void hideProgress(){
         try{
-            int mock_location = Settings.Secure.getInt(getContentResolver(), "mock_location");
-            if(mock_location == 0){
-                try{
-                    Settings.Secure.putInt(getContentResolver(), "mock_location", 1);
-                } catch(Exception ignored){
-                }
-                mock_location = Settings.Secure.getInt(getContentResolver(), "mock_location");
-            }
-
-            if(mock_location == 0){
-                AlertDialog.Builder ab = new AlertDialog.Builder(this);
-                ab.setCancelable(false);
-                ab.setMessage("Enable 'Mock locations' to use this application");
-                ab.setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener(){
-
-                    @Override
-                    public void onClick(final DialogInterface dialog, final int which){
-                        startActivity(new Intent().setClassName("com.android.settings",
-                                                                "com.android.settings.DevelopmentSettings"));
-                    }
-                });
-                ab.show();
-            }
-        } catch(Exception ex){
-            ex.printStackTrace();
+            mProgressDialog.dismiss();
+        } catch(Exception ignored){
         }
     }
-
 }
+

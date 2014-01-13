@@ -1,8 +1,15 @@
 package mobi.droid.fakeroad.location;
 
+import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.DialogInterface;
+import android.content.Intent;
 import android.location.Location;
+import android.provider.Settings;
 import android.util.Log;
 import android.util.Pair;
+import com.directions.route.Routing;
+import com.directions.route.RoutingListener;
 import com.google.android.gms.maps.model.LatLng;
 
 import java.util.LinkedList;
@@ -139,4 +146,39 @@ public class MapsHelper{
         return new LatLng(lat2 * DEGREES, lon2 * DEGREES);
     }
 
+    public static void calculateRoute(final LatLng aStart, final LatLng aEnd, final RoutingListener aRoutingListener){
+        Routing routing = new Routing(Routing.TravelMode.DRIVING);
+        routing.registerListener(aRoutingListener);
+        routing.execute(aStart, aEnd);
+    }
+
+    public static void checkIfMockEnabled(final Activity aContext){
+        try{
+            int mock_location = Settings.Secure.getInt(aContext.getContentResolver(), "mock_location");
+            if(mock_location == 0){
+                try{
+                    Settings.Secure.putInt(aContext.getContentResolver(), "mock_location", 1);
+                } catch(Exception ignored){
+                }
+                mock_location = Settings.Secure.getInt(aContext.getContentResolver(), "mock_location");
+            }
+
+            if(mock_location == 0){
+                AlertDialog.Builder ab = new AlertDialog.Builder(aContext);
+                ab.setCancelable(false);
+                ab.setMessage("Enable 'Mock locations' to use this application");
+                ab.setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener(){
+
+                    @Override
+                    public void onClick(final DialogInterface dialog, final int which){
+                        aContext.startActivity(new Intent().setClassName("com.android.settings",
+                                                                         "com.android.settings.DevelopmentSettings"));
+                    }
+                });
+                ab.show();
+            }
+        } catch(Exception ex){
+            ex.printStackTrace();
+        }
+    }
 }
