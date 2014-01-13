@@ -1,19 +1,16 @@
 package mobi.droid.fakeroad.ui.activity;
 
-import android.app.Activity;
-import android.app.Fragment;
-import android.app.FragmentManager;
-import android.app.FragmentTransaction;
+import android.app.*;
+import android.content.DialogInterface;
+import android.content.Intent;
+import android.graphics.Bitmap;
 import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
-import android.app.AlertDialog;
-import android.content.DialogInterface;
-import android.content.Intent;
-import android.os.Bundle;
-import android.provider.Settings;
 import android.widget.Toast;
 import com.directions.route.Routing;
 import com.directions.route.RoutingListener;
@@ -23,6 +20,7 @@ import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.PolylineOptions;
+import com.google.maps.android.ui.IconGenerator;
 import mobi.droid.fakeroad.R;
 import mobi.droid.fakeroad.location.MapsHelper;
 import mobi.droid.fakeroad.ui.fragments.SearchLocationFragment;
@@ -35,6 +33,7 @@ public class MainActivity extends Activity{
     private MapView mMapView;
     private GoogleMap mMap;
     private LinkedList<LatLng> mMarkers = new LinkedList<LatLng>();
+    private IconGenerator mIconGenerator;
 
     private void assignViews(){
         mMapView = (MapView) findViewById(R.id.mapView);
@@ -46,6 +45,10 @@ public class MainActivity extends Activity{
         setContentView(R.layout.main);
 
         assignViews();
+
+        mIconGenerator = new IconGenerator(this);
+        mIconGenerator.setBackground(new ColorDrawable(Color.LTGRAY));
+        mIconGenerator.setContentPadding(2, 2, 2, 2);
 
         mMapView.onCreate(savedInstanceState);
         mMapView.onResume();//needed to get the map to display immediately
@@ -92,9 +95,14 @@ public class MainActivity extends Activity{
                         distanceMarker.visible(true);
 
                         // TODO use https://github.com/googlemaps/android-maps-utils to generate icons with text
-
-                        distanceMarker.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE));
-                        distanceMarker.title(String.valueOf(distance) + "m");
+                        Bitmap icon;
+                        if(distance < 1000){
+                            icon = mIconGenerator.makeIcon(String.valueOf(distance) + " m");
+                        } else{
+                            icon = mIconGenerator.makeIcon(
+                                    String.valueOf(distance / 1000) + "." + String.valueOf(distance % 1000) + " km");
+                        }
+                        distanceMarker.icon(BitmapDescriptorFactory.fromBitmap(icon));
                         mMap.addMarker(distanceMarker);
                     }
                 }
@@ -124,11 +132,14 @@ public class MainActivity extends Activity{
             @Override
             public void onRoutingSuccess(final PolylineOptions mPolyOptions){
                 mMap.clear();
-                PolylineOptions polyoptions = new PolylineOptions();
-                polyoptions.color(Color.BLUE);
-                polyoptions.width(10);
-                polyoptions.addAll(mPolyOptions.getPoints());
-                mMap.addPolyline(polyoptions);
+
+                PolylineOptions polylineOptions = new PolylineOptions();
+                polylineOptions.color(Color.BLUE);
+                polylineOptions.width(10);
+                polylineOptions.addAll(mPolyOptions.getPoints());
+
+                mMap.addPolyline(polylineOptions);
+
                 addMarkerStart(aStart);
                 addMarkerEnd(aEnd);
             }
