@@ -23,6 +23,7 @@ import mobi.droid.fakeroad.ui.fragments.PathFragment;
 import mobi.droid.fakeroad.ui.fragments.SearchLocationFragment;
 
 import java.util.LinkedList;
+import java.util.List;
 
 public class MainActivity extends BaseMapViewActivity{
 
@@ -40,10 +41,7 @@ public class MainActivity extends BaseMapViewActivity{
         @Override
         public void onTabSelected(final ActionBar.Tab tab, final FragmentTransaction ft){
             invalidateOptionsMenu();
-            mMap.clear();
-            mMarkers.clear();
-            mRouteStartMarkerOptions = null;
-            mRouteEndMarkerOptions = null;
+            cleanup();
 
             if(tab.getTag().equals(TAG_ROUTE)){
                 pushFragment(SearchLocationFragment.class, null, R.id.fragmentHeader);
@@ -61,6 +59,14 @@ public class MainActivity extends BaseMapViewActivity{
             }
         }
 
+        private void cleanup(){
+            mMap.clear();
+            mMarkers.clear();
+            mRouteStartMarkerOptions = null;
+            mRouteEndMarkerOptions = null;
+            mRoutingPoints = null;
+        }
+
         @Override
         public void onTabUnselected(final ActionBar.Tab tab, final FragmentTransaction ft){
             if(TAG_PATH.equals(tab.getTag())){
@@ -75,6 +81,7 @@ public class MainActivity extends BaseMapViewActivity{
         public void onTabReselected(final ActionBar.Tab tab, final FragmentTransaction ft){
         }
     };
+    private List<LatLng> mRoutingPoints;
 
     @Override
     public void onCreate(final Bundle savedInstanceState){
@@ -173,7 +180,7 @@ public class MainActivity extends BaseMapViewActivity{
             }
 
             @Override
-            public void onRoutingSuccess(final PolylineOptions mPolyOptions){
+            public void onRoutingSuccess(final PolylineOptions aPolyOptions){
                 hideProgress();
                 if(mMap != null){
                     mMap.clear();
@@ -193,7 +200,9 @@ public class MainActivity extends BaseMapViewActivity{
                     PolylineOptions polylineOptions = new PolylineOptions();
                     polylineOptions.color(Color.BLUE);
                     polylineOptions.width(10);
-                    polylineOptions.addAll(mPolyOptions.getPoints());
+
+                    mRoutingPoints = aPolyOptions.getPoints();
+                    polylineOptions.addAll(mRoutingPoints);
 
                     mMap.addPolyline(polylineOptions);
                 }
