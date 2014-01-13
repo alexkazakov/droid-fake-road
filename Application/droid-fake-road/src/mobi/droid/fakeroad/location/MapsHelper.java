@@ -5,11 +5,12 @@ import android.util.Log;
 import android.util.Pair;
 import com.google.android.gms.maps.model.LatLng;
 
-import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 
 public class MapsHelper{
+
+    public static final String TAG = "mobi.droid.fakeroad";
 
     /**
      * Calculate the bearing between two points.
@@ -43,14 +44,14 @@ public class MapsHelper{
         return result;
     }
 
-    public static LinkedList<LatLng> getPathPointsForTime(long aTime, final LatLng[] aPoints){
-        double fullPathMeters = distance(Arrays.asList(aPoints));
+    public static LinkedList<LatLng> getPathPointsForTime(long aTime, final List<LatLng> aPoints){
+        double fullPathMeters = distance(aPoints);
         int speed = (int) (fullPathMeters / aTime);
         return getPathPointsForSpeed(speed, aPoints);
     }
 
-    public static LinkedList<LatLng> getPathPointsForSpeed(final int aSpeedMetersPerSecond, final LatLng[] aPoints){
-        double fullPathMeters = distance(Arrays.asList(aPoints));
+    public static LinkedList<LatLng> getPathPointsForSpeed(final int aSpeedMetersPerSecond, final List<LatLng> aPoints){
+        double fullPathMeters = distance(aPoints);
         if(aSpeedMetersPerSecond < 1){
             throw new IllegalArgumentException("Speed must be > 1 m/s");
         }
@@ -62,12 +63,12 @@ public class MapsHelper{
 
         LinkedList<LatLng> points = new LinkedList<LatLng>();
 
-        addPoint(points, aPoints[0]);
+        addPoint(points, aPoints.get(0));
         if(pointCount == 2){
-            addPoint(points, aPoints[aPoints.length - 1]);
+            addPoint(points, aPoints.get(aPoints.size() - 1));
         } else{
-            Pair<LatLng, LatLng> lastPoint = Pair.create(aPoints[0], aPoints[0]);
-            while(lastPoint.first != aPoints[aPoints.length - 1]){
+            Pair<LatLng, LatLng> lastPoint = Pair.create(aPoints.get(0), aPoints.get(0));
+            while(lastPoint.first != aPoints.get(aPoints.size() - 1)){
                 lastPoint = nextLatLng(lastPoint, points, aPoints, aSpeedMetersPerSecond);
             }
         }
@@ -76,12 +77,12 @@ public class MapsHelper{
 
     private static void addPoint(final LinkedList<LatLng> aPoints, final LatLng aPoint){
         aPoints.addLast(aPoint);
-        Log.v("mobi.droid.fakeroad", "Added [" + aPoints.size() + "] location: " + aPoint);
+        Log.v(TAG, "Added [" + aPoints.size() + "] location: " + aPoint);
     }
 
     private static Pair<LatLng, LatLng> nextLatLng(final Pair<LatLng, LatLng> aLastPoint,
                                                    final LinkedList<LatLng> aResultPoints,
-                                                   final LatLng[] aSourcePoints,
+                                                   final List<LatLng> aSourcePoints,
                                                    final int aDistance){
         int totalDistance = aDistance;
         int startIndex = -1;
@@ -91,14 +92,14 @@ public class MapsHelper{
                 break;
             }
         }
-        for(int i = startIndex; i < aSourcePoints.length - 1; i++){
+        for(int i = startIndex; i < aSourcePoints.size() - 1; i++){
             LatLng p1;
             if(i == startIndex){
                 p1 = aLastPoint.second;
             } else{
-                p1 = aSourcePoints[i];
+                p1 = aSourcePoints.get(i);
             }
-            LatLng p2 = aSourcePoints[i + 1];
+            LatLng p2 = aSourcePoints.get(i + 1);
 
             double distance = distance(p1, p2);
             if(distance < totalDistance){
@@ -106,10 +107,10 @@ public class MapsHelper{
             } else{
                 LatLng point = calcLngLat(p1, totalDistance, MapsHelper.bearing(p1, p2));
                 addPoint(aResultPoints, point);
-                return Pair.create(aSourcePoints[i], point);
+                return Pair.create(aSourcePoints.get(i), point);
             }
         }
-        LatLng sourcePoint = aSourcePoints[aSourcePoints.length - 1];
+        LatLng sourcePoint = aSourcePoints.get(aSourcePoints.size() - 1);
         addPoint(aResultPoints, sourcePoint);
         return Pair.create(sourcePoint, sourcePoint);
     }

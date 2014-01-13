@@ -10,10 +10,13 @@ import android.location.LocationManager;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.SystemClock;
 import com.google.android.gms.maps.model.LatLng;
 import mobi.droid.fakeroad.Actions;
 import mobi.droid.fakeroad.location.MapsHelper;
 
+import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.LinkedList;
 
 public class FakeLocationService extends Service{
@@ -21,7 +24,9 @@ public class FakeLocationService extends Service{
     public static final String EXTRA_POINTS = "points";
     public static final String EXTRA_SPEED = "speed";
     public static final String EXTRA_TIME = "time";
+    //
     public static final int LOCATION_UPDATE_INTERVAL = 1000;
+    //
     private Handler mHandler = new Handler();
     private boolean mMoving;
     private LocationGenerator mGenerator;
@@ -46,6 +51,10 @@ public class FakeLocationService extends Service{
     }
 
     private void stopMoving(){
+        LocationManager locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+        locationManager.setTestProviderEnabled(LocationManager.GPS_PROVIDER, false);
+        locationManager.removeTestProvider(LocationManager.GPS_PROVIDER);
+
         mHandler.removeCallbacks(mGenerator);
         mMoving = false;
         stopForeground(true);
@@ -55,7 +64,7 @@ public class FakeLocationService extends Service{
     private void startMoving(final Intent aIntent){
         mMoving = true;
 
-        LatLng[] sourcePoints = (LatLng[]) aIntent.getParcelableArrayExtra(EXTRA_POINTS);
+        ArrayList<LatLng> sourcePoints = aIntent.getParcelableArrayListExtra(EXTRA_POINTS);
         int speed = aIntent.getIntExtra(EXTRA_SPEED, 0);
         long time = aIntent.getLongExtra(EXTRA_TIME, 0);
 
@@ -76,7 +85,12 @@ public class FakeLocationService extends Service{
         Notification build = buildNotification();
         startForeground(1, build);
 
-        mGenerator = new LocationGenerator(pointsList);
+        LocationManager locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+        locationManager.addTestProvider(LocationManager.GPS_PROVIDER, false, false, false, false, false, true, true, 1,
+                                        0);
+        locationManager.setTestProviderEnabled(LocationManager.GPS_PROVIDER, true);
+
+        mGenerator = new LocationGenerator(pointsList, speed);
         mHandler.post(mGenerator);
     }
 
@@ -101,13 +115,15 @@ public class FakeLocationService extends Service{
         return b.getNotification();
     }
 
+    //
     private class LocationGenerator implements Runnable{
 
         private LinkedList<LatLng> mList;
-        private LatLng mPreviousLocation;
+        private int mSpeed;
 
-        private LocationGenerator(final LinkedList<LatLng> aList){
+        private LocationGenerator(final LinkedList<LatLng> aList, final int aSpeed){
             mList = aList;
+            mSpeed = aSpeed;
         }
 
         @Override
@@ -115,27 +131,46 @@ public class FakeLocationService extends Service{
             if(!mMoving){
                 return;
             }
-            LatLng location = mList.poll();
-            if(location == null){
+            LatLng latLng = mList.poll();
+            if(latLng == null){
                 stopMoving();
                 return;
             } else{
                 LocationManager lm = (LocationManager) getSystemService(LOCATION_SERVICE);
-                Location loc = new Location(LocationManager.GPS_PROVIDER);
-                loc.setLatitude(location.latitude);
-                loc.setLongitude(location.latitude);
-                if(mPreviousLocation != null){
-                    loc.setBearing(MapsHelper.bearing(mPreviousLocation, location));
+
+                Location location = new Location(LocationManager.GPS_PROVIDER);
+                location.setLatitude(latLng.latitude);
+                location.setLongitude(latLng.longitude);
+                location.setAccuracy(0.0f);
+
+                location.setSpeed(mSpeed);
+                LatLng nextLocation = mList.peek();
+                if(nextLocation != null){
+                    location.setBearing(MapsHelper.bearing(latLng, nextLocation));
                 }
+
+                location.setTime(System.currentTimeMillis());
+                if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1){
+                    location.setElapsedRealtimeNanos(SystemClock.elapsedRealtimeNanos());
+                }
+
+                try{ // trick to initialize all last fields with default values
+                    Method locationJellyBeanFixMethod = Location.class.getMethod("makeComplete");
+                    if(locationJellyBeanFixMethod != null){
+                        locationJellyBeanFixMethod.invoke(location);
+                    }
+                } catch(Exception e){
+                    e.printStackTrace();
+                }
+
                 try{
-                    lm.setTestProviderLocation(LocationManager.GPS_PROVIDER, loc);
+                    lm.setTestProviderLocation(LocationManager.GPS_PROVIDER, location);
                 } catch(Exception e){
                     e.printStackTrace(); // TODO AK handle errors
                     stopMoving();
                     return;
                 }
             }
-            mPreviousLocation = location;
             mHandler.postDelayed(this, LOCATION_UPDATE_INTERVAL);
         }
     }
