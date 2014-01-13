@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.graphics.BitmapFactory;
 import android.location.Location;
 import android.location.LocationManager;
+import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import com.google.android.gms.maps.model.LatLng;
@@ -66,16 +67,15 @@ public class FakeLocationService extends Service{
 
         LinkedList<LatLng> pointsList;
         if(speed <= -1){
-            pointsList = MapsHelper.calculatePathBasedOnTime(time, sourcePoints);
+            pointsList = MapsHelper.getPathPointsForTime(time, sourcePoints);
         } else{
-            pointsList = MapsHelper.calculatePathBasedOnSpeed(speed, sourcePoints);
+            pointsList = MapsHelper.getPathPointsForSpeed(speed, sourcePoints);
         }
 
         @SuppressWarnings("deprecation")
         Notification build = buildNotification();
         startForeground(1, build);
 
-        // TODO start processing points
         mGenerator = new LocationGenerator(pointsList);
         mHandler.post(mGenerator);
     }
@@ -93,6 +93,11 @@ public class FakeLocationService extends Service{
         b.setContentText("Click to stop fake movement");
         b.setWhen(System.currentTimeMillis());
 
+        //noinspection deprecation
+        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN){
+            return b.build();
+        }
+        //noinspection deprecation
         return b.getNotification();
     }
 
