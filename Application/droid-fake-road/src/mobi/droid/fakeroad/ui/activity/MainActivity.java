@@ -9,6 +9,11 @@ import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
+import android.app.AlertDialog;
+import android.content.DialogInterface;
+import android.content.Intent;
+import android.os.Bundle;
+import android.provider.Settings;
 import android.widget.Toast;
 import com.directions.route.Routing;
 import com.directions.route.RoutingListener;
@@ -203,6 +208,7 @@ public class MainActivity extends Activity{
         if(mMapView != null){
             mMapView.onResume();
         }
+        checkIfMockEnabled();
     }
 
     @Override
@@ -218,6 +224,36 @@ public class MainActivity extends Activity{
         super.onSaveInstanceState(outState);
         if(mMapView != null){
             mMapView.onSaveInstanceState(outState);
+        }
+    }
+
+    private void checkIfMockEnabled(){
+        try{
+            int mock_location = Settings.Secure.getInt(getContentResolver(), "mock_location");
+            if(mock_location == 0){
+                try{
+                    Settings.Secure.putInt(getContentResolver(), "mock_location", 1);
+                } catch(Exception ignored){
+                }
+                mock_location = Settings.Secure.getInt(getContentResolver(), "mock_location");
+            }
+
+            if(mock_location == 0){
+                AlertDialog.Builder ab = new AlertDialog.Builder(this);
+                ab.setCancelable(false);
+                ab.setMessage("Enable 'Mock locations' to use this application");
+                ab.setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener(){
+
+                    @Override
+                    public void onClick(final DialogInterface dialog, final int which){
+                        startActivity(new Intent().setClassName("com.android.settings",
+                                                                "com.android.settings.DevelopmentSettings"));
+                    }
+                });
+                ab.show();
+            }
+        } catch(Exception ex){
+            ex.printStackTrace();
         }
     }
 
