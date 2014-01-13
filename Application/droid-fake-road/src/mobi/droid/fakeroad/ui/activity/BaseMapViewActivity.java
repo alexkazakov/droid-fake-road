@@ -1,13 +1,7 @@
 package mobi.droid.fakeroad.ui.activity;
 
 import android.app.Activity;
-import android.app.Fragment;
-import android.app.FragmentManager;
-import android.app.FragmentTransaction;
 import android.os.Bundle;
-import android.view.Menu;
-import android.view.MenuInflater;
-import android.view.MenuItem;
 import android.widget.Toast;
 import com.google.android.gms.common.GooglePlayServicesNotAvailableException;
 import com.google.android.gms.maps.GoogleMap;
@@ -17,9 +11,6 @@ import com.google.android.gms.maps.UiSettings;
 import com.google.android.gms.maps.model.LatLng;
 import mobi.droid.fakeroad.R;
 import mobi.droid.fakeroad.location.MapsHelper;
-import mobi.droid.fakeroad.ui.fragments.SearchLocationFragment;
-
-import java.util.LinkedList;
 
 /**
  * Created by ak on 13.01.14.
@@ -28,7 +19,6 @@ public abstract class BaseMapViewActivity extends Activity{
 
     protected MapView mMapView;
     protected GoogleMap mMap;
-    protected LinkedList<LatLng> mMarkers = new LinkedList<LatLng>();
 
     private void assignViews(){
         mMapView = (MapView) findViewById(R.id.mapView);
@@ -37,7 +27,7 @@ public abstract class BaseMapViewActivity extends Activity{
     @Override
     public void onCreate(Bundle savedInstanceState){
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.main);
+        setContentView(R.layout.activity_main);
 
         assignViews();
 
@@ -68,36 +58,6 @@ public abstract class BaseMapViewActivity extends Activity{
     }
 
     protected abstract void onAddMarker(LatLng aLatLng);
-
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu){
-        MenuInflater inflater = getMenuInflater();
-        inflater.inflate(R.menu.main_menu, menu);
-        return true;
-    }
-
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item){
-        // Handle item selection
-        switch(item.getItemId()){
-            case R.id.new_route:
-                pushFragment(SearchLocationFragment.class, null, R.id.fragmentHeader);
-                return true;
-            default:
-                return super.onOptionsItemSelected(item);
-        }
-    }
-
-    protected void pushFragment(Class<? extends Fragment> cls, Bundle args, final int rootID){
-        FragmentManager manager = getFragmentManager();
-        FragmentTransaction tr = manager.beginTransaction();
-
-        if(manager.findFragmentByTag(cls.getName()) == null){
-            tr.setCustomAnimations(android.R.animator.fade_in, android.R.animator.fade_out);
-            tr.replace(rootID, Fragment.instantiate(this, cls.getName(), args), cls.getName());
-            tr.commitAllowingStateLoss();
-        }
-    }
 
     @Override
     public void onDestroy(){

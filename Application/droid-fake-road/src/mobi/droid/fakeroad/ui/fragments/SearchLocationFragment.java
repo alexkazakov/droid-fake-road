@@ -30,7 +30,7 @@ public class SearchLocationFragment extends Fragment implements View.OnClickList
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState){
-        View inflate = inflater.inflate(R.layout.search_location_fragment, container, false);
+        View inflate = inflater.inflate(R.layout.fragment_search_location, container, false);
 
         //noinspection ConstantConditions
         inflate.findViewById(R.id.btnSearchFrom).setOnClickListener(this);

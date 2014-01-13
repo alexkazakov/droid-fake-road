@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+
+    <item
+            android:id="@+id/action_start_route"
+            android:title="Start"
+            android:icon="@android:drawable/ic_media_play"
+            android:showAsAction="always"/>
+
+    <item
+            android:id="@+id/action_stop_route"
+            android:title="Stop"
+            android:icon="@android:drawable/ic_menu_close_clear_cancel"
+            android:showAsAction="always"/>
+
+    <item
+            android:id="@+id/action_new_route"
+            android:title="@string/new_route"
+            android:icon="@android:drawable/ic_menu_delete"
+            android:showAsAction="ifRoom|withText"/>
+
+</menu>

@@ -1,10 +1,13 @@
 package mobi.droid.fakeroad.ui.activity;
 
-import android.app.ProgressDialog;
+import android.app.*;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
 import android.widget.Toast;
 import com.directions.route.RoutingListener;
 import com.google.android.gms.maps.CameraUpdateFactory;
@@ -16,13 +19,73 @@ import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.maps.android.ui.IconGenerator;
 import mobi.droid.fakeroad.R;
 import mobi.droid.fakeroad.location.MapsHelper;
+import mobi.droid.fakeroad.ui.fragments.PathFragment;
+import mobi.droid.fakeroad.ui.fragments.SearchLocationFragment;
+
+import java.util.LinkedList;
 
 public class MainActivity extends BaseMapViewActivity{
 
+    public static final String TAG_ROUTE = "route";
+    public static final String TAG_PATH = "path";
     private IconGenerator mIconGenerator;
+    ///
     private MarkerOptions mRouteStartMarkerOptions;
     private MarkerOptions mRouteEndMarkerOptions;
+    private LinkedList<LatLng> mMarkers = new LinkedList<LatLng>();
+    ///
     private ProgressDialog mProgressDialog;
+    private ActionBar.TabListener mTabListener = new ActionBar.TabListener(){
+
+        @Override
+        public void onTabSelected(final ActionBar.Tab tab, final FragmentTransaction ft){
+            invalidateOptionsMenu();
+            mMap.clear();
+            mMarkers.clear();
+            mRouteStartMarkerOptions = null;
+            mRouteEndMarkerOptions = null;
+
+            if(tab.getTag().equals(TAG_ROUTE)){
+                pushFragment(SearchLocationFragment.class, null, R.id.fragmentHeader);
+            } else if(tab.getTag().equals(TAG_PATH)){
+                pushFragment(PathFragment.class, null, R.id.fragmentHeader);
+                if(mMap != null){
+                    mMap.setOnMapLongClickListener(new GoogleMap.OnMapLongClickListener(){
+
+                        @Override
+                        public void onMapLongClick(final LatLng aLatLng){
+                            onAddMarker(aLatLng);
+                        }
+                    });
+                }
+            }
+        }
+
+        @Override
+        public void onTabUnselected(final ActionBar.Tab tab, final FragmentTransaction ft){
+            if(TAG_PATH.equals(tab.getTag())){
+                if(mMap != null){
+                    mMap.setOnMapLongClickListener(null);
+                }
+
+            }
+        }
+
+        @Override
+        public void onTabReselected(final ActionBar.Tab tab, final FragmentTransaction ft){
+        }
+    };
+
+    @Override
+    public void onCreate(final Bundle savedInstanceState){
+        super.onCreate(savedInstanceState);
+
+        ActionBar bar = getActionBar();
+        //noinspection ConstantConditions
+        bar.setNavigationMode(ActionBar.NAVIGATION_MODE_TABS);
+        bar.addTab(bar.newTab().setText("Routing (start+finish)").setTabListener(mTabListener).setTag(TAG_ROUTE));
+        bar.addTab(bar.newTab().setText("Path").setTabListener(mTabListener).setTag(TAG_PATH));
+    }
 
     @Override
     protected void configureMap(final Bundle savedInstanceState){
@@ -31,16 +94,6 @@ public class MainActivity extends BaseMapViewActivity{
         mIconGenerator = new IconGenerator(this);
         mIconGenerator.setBackground(new ColorDrawable(Color.LTGRAY));
         mIconGenerator.setContentPadding(2, 2, 2, 2);
-
-        if(mMap != null){
-            mMap.setOnMapLongClickListener(new GoogleMap.OnMapLongClickListener(){
-
-                @Override
-                public void onMapLongClick(final LatLng aLatLng){
-                    onAddMarker(aLatLng);
-                }
-            });
-        }
     }
 
     @Override
@@ -115,7 +168,8 @@ public class MainActivity extends BaseMapViewActivity{
 
             @Override
             public void onRoutingStart(){
-                mProgressDialog = ProgressDialog.show(MainActivity.this, null, "Routing calculation...", true);
+                String message = "Routing calculation...";
+                showProgress(message);
             }
 
             @Override
@@ -153,11 +207,64 @@ public class MainActivity extends BaseMapViewActivity{
         super.onPause();
     }
 
+    private void showProgress(final String aMessage){
+        mProgressDialog = ProgressDialog.show(this, null, aMessage, true);
+    }
+
     private void hideProgress(){
         try{
             mProgressDialog.dismiss();
         } catch(Exception ignored){
         }
     }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu){
+        MenuInflater inflater = getMenuInflater();
+        //noinspection ConstantConditions
+        ActionBar.Tab selectedTab = getActionBar().getSelectedTab();
+        if(selectedTab != null){
+            Object tag = selectedTab.getTag();
+            if(TAG_ROUTE.equals(tag)){
+                inflater.inflate(R.menu.routing_menu, menu);
+            } else if(TAG_PATH.equals(tag)){
+                inflater.inflate(R.menu.path_menu, menu);
+            }
+        }
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item){
+        // Handle item selection
+        // TODO
+        switch(item.getItemId()){
+            case R.id.action_new_path:
+                break;
+            case R.id.action_new_route:
+                break;
+            case R.id.action_start_path:
+                break;
+            case R.id.action_start_route:
+                break;
+            case R.id.action_stop_path:
+                break;
+            case R.id.action_stop_route:
+                break;
+        }
+        return super.onOptionsItemSelected(item);
+    }
+
+    protected void pushFragment(Class<? extends Fragment> cls, Bundle args, final int rootID){
+        FragmentManager manager = getFragmentManager();
+        FragmentTransaction tr = manager.beginTransaction();
+
+        if(manager.findFragmentByTag(cls.getName()) == null){
+            tr.setCustomAnimations(android.R.animator.fade_in, android.R.animator.fade_out);
+            tr.replace(rootID, Fragment.instantiate(this, cls.getName(), args), cls.getName());
+            tr.commitAllowingStateLoss();
+        }
+    }
+
 }
 
