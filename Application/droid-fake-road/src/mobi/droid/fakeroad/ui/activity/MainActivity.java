@@ -34,7 +34,7 @@ public class MainActivity extends BaseMapViewActivity{
     private MarkerOptions mRouteStartMarkerOptions;
     private MarkerOptions mRouteEndMarkerOptions;
     private LinkedList<LatLng> mMarkers = new LinkedList<LatLng>();
-    private List<LatLng> mRoutingPoints;
+
     ///
     private ProgressDialog mProgressDialog;
     boolean calculateRoute = true; //TODO need add settings.
@@ -47,7 +47,6 @@ public class MainActivity extends BaseMapViewActivity{
         mMarkers.clear();
         mRouteStartMarkerOptions = null;
         mRouteEndMarkerOptions = null;
-        mRoutingPoints = null;
     }
 
     @Override
@@ -189,8 +188,10 @@ public class MainActivity extends BaseMapViewActivity{
                     PolylineOptions polylineOptions = new PolylineOptions();
                     polylineOptions.color(Color.BLUE);
                     polylineOptions.width(10);
-                    mRoutingPoints = aPolyOptions.getPoints();
+                    List<LatLng> mRoutingPoints = aPolyOptions.getPoints();
                     polylineOptions.addAll(mRoutingPoints);
+
+                    mMarkers.addAll(mRoutingPoints);
 
                     double distance = MapsHelper.distance(mRoutingPoints);
                     addDistanceMarker((int) distance, mRoutingPoints.get(mRoutingPoints.size() / 2));
