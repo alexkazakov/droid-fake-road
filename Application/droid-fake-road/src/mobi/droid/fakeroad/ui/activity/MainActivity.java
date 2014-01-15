@@ -1,6 +1,7 @@
 package mobi.droid.fakeroad.ui.activity;
 
 import android.app.*;
+import android.content.DialogInterface;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
@@ -8,6 +9,9 @@ import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
+import android.view.ViewGroup;
+import android.widget.FrameLayout;
+import android.widget.SeekBar;
 import android.widget.Toast;
 import com.directions.route.RoutingListener;
 import com.google.android.gms.maps.CameraUpdateFactory;
@@ -16,6 +20,7 @@ import com.google.android.gms.maps.model.*;
 import com.google.maps.android.ui.IconGenerator;
 import mobi.droid.fakeroad.R;
 import mobi.droid.fakeroad.location.MapsHelper;
+import mobi.droid.fakeroad.service.FakeLocationService;
 import mobi.droid.fakeroad.ui.fragments.PathFragment;
 import mobi.droid.fakeroad.ui.fragments.SearchLocationFragment;
 
@@ -31,6 +36,7 @@ public class MainActivity extends BaseMapViewActivity{
     private MarkerOptions mRouteStartMarkerOptions;
     private MarkerOptions mRouteEndMarkerOptions;
     private LinkedList<LatLng> mMarkers = new LinkedList<LatLng>();
+    private List<LatLng> mRoutingPoints;
     ///
     private ProgressDialog mProgressDialog;
     boolean calculateRoute = true; //TODO need add settings.
@@ -58,14 +64,6 @@ public class MainActivity extends BaseMapViewActivity{
             }
         }
 
-        private void cleanup(){
-            mMap.clear();
-            mMarkers.clear();
-            mRouteStartMarkerOptions = null;
-            mRouteEndMarkerOptions = null;
-            mRoutingPoints = null;
-        }
-
         @Override
         public void onTabUnselected(final ActionBar.Tab tab, final FragmentTransaction ft){
             if(TAG_PATH.equals(tab.getTag())){
@@ -80,7 +78,15 @@ public class MainActivity extends BaseMapViewActivity{
         public void onTabReselected(final ActionBar.Tab tab, final FragmentTransaction ft){
         }
     };
-    private List<LatLng> mRoutingPoints;
+    private int mSpeed;
+
+    private void cleanup(){
+        mMap.clear();
+        mMarkers.clear();
+        mRouteStartMarkerOptions = null;
+        mRouteEndMarkerOptions = null;
+        mRoutingPoints = null;
+    }
 
     @Override
     public void onCreate(final Bundle savedInstanceState){
@@ -250,10 +256,53 @@ public class MainActivity extends BaseMapViewActivity{
         // TODO
         switch(item.getItemId()){
             case R.id.action_new_route:
+                cleanup();
                 break;
             case R.id.action_start_route:
+                mSpeed = 10;
+                AlertDialog.Builder ab = new AlertDialog.Builder(this);
+                final SeekBar seekBar = new SeekBar(this);
+                seekBar.setMax(100);
+                seekBar.setProgress(mSpeed);
+                seekBar.setLayoutParams(new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                                                                     ViewGroup.LayoutParams.WRAP_CONTENT));
+                seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
+
+                    @Override
+                    public void onProgressChanged(final SeekBar seekBar, final int progress, final boolean fromUser){
+                        mSpeed = (1 + progress);
+                    }
+
+                    @Override
+                    public void onStartTrackingTouch(final SeekBar seekBar){
+                    }
+
+                    @Override
+                    public void onStopTrackingTouch(final SeekBar seekBar){
+                    }
+                });
+                ab.setView(seekBar);
+                ab.setTitle("Setup speed");
+                ab.setPositiveButton("Go", new DialogInterface.OnClickListener(){
+
+                    @Override
+                    public void onClick(final DialogInterface dialog, final int which){
+                        dialog.dismiss();
+                        FakeLocationService.start(MainActivity.this, mSpeed, -1, mMarkers);
+                    }
+                });
+                ab.setNegativeButton(android.R.string.cancel, new DialogInterface.OnClickListener(){
+
+                    @Override
+                    public void onClick(final DialogInterface dialog, final int which){
+                        dialog.dismiss();
+                    }
+                });
+                ab.show();
+
                 break;
             case R.id.action_stop_route:
+                FakeLocationService.stop(this);
                 break;
         }
         return super.onOptionsItemSelected(item);

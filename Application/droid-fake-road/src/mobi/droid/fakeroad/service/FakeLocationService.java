@@ -3,6 +3,7 @@ package mobi.droid.fakeroad.service;
 import android.app.Notification;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.content.Context;
 import android.content.Intent;
 import android.graphics.BitmapFactory;
 import android.location.Location;
@@ -18,6 +19,7 @@ import mobi.droid.fakeroad.location.MapsHelper;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.LinkedList;
+import java.util.List;
 
 public class FakeLocationService extends Service{
 
@@ -34,6 +36,21 @@ public class FakeLocationService extends Service{
     @Override
     public IBinder onBind(final Intent intent){
         return null;
+    }
+
+    public static void start(Context aContext, int aSpeed, long aTime, List<LatLng> aRoute){
+        Intent intent = new Intent(Actions.ACTION_START_MOVING);
+        intent.setClass(aContext, FakeLocationService.class);
+        intent.putExtra(EXTRA_POINTS, new ArrayList<LatLng>(aRoute));
+        intent.putExtra(EXTRA_SPEED, aSpeed);
+        intent.putExtra(EXTRA_TIME, aTime);
+        aContext.startService(intent);
+    }
+
+    public static void stop(Context aContext){
+        Intent intent = new Intent(Actions.ACTION_STOP_MOVING);
+        intent.setClass(aContext, FakeLocationService.class);
+        aContext.startService(intent);
     }
 
     @Override
