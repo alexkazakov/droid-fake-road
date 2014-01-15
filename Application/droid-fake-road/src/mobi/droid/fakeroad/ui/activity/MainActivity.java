@@ -259,53 +259,58 @@ public class MainActivity extends BaseMapViewActivity{
                 cleanup();
                 break;
             case R.id.action_start_route:
-                mSpeed = 10;
-                AlertDialog.Builder ab = new AlertDialog.Builder(this);
-                final SeekBar seekBar = new SeekBar(this);
-                seekBar.setMax(100);
-                seekBar.setProgress(mSpeed);
-                seekBar.setLayoutParams(new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
-                                                                     ViewGroup.LayoutParams.WRAP_CONTENT));
-                seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
-
-                    @Override
-                    public void onProgressChanged(final SeekBar seekBar, final int progress, final boolean fromUser){
-                        mSpeed = (1 + progress);
-                    }
-
-                    @Override
-                    public void onStartTrackingTouch(final SeekBar seekBar){
-                    }
-
-                    @Override
-                    public void onStopTrackingTouch(final SeekBar seekBar){
-                    }
-                });
-                ab.setView(seekBar);
-                ab.setTitle("Setup speed");
-                ab.setPositiveButton("Go", new DialogInterface.OnClickListener(){
-
-                    @Override
-                    public void onClick(final DialogInterface dialog, final int which){
-                        dialog.dismiss();
-                        FakeLocationService.start(MainActivity.this, mSpeed, -1, mMarkers);
-                    }
-                });
-                ab.setNegativeButton(android.R.string.cancel, new DialogInterface.OnClickListener(){
-
-                    @Override
-                    public void onClick(final DialogInterface dialog, final int which){
-                        dialog.dismiss();
-                    }
-                });
-                ab.show();
-
+                showSpeedDialog();
                 break;
             case R.id.action_stop_route:
                 FakeLocationService.stop(this);
                 break;
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    private void showSpeedDialog(){
+        mSpeed = 10;
+        AlertDialog.Builder ab = new AlertDialog.Builder(this);
+        final SeekBar seekBar = new SeekBar(this);
+        ab.setView(seekBar);
+        seekBar.setMax(99);
+        seekBar.setProgress(mSpeed);
+        seekBar.setLayoutParams(new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                                                             ViewGroup.LayoutParams.WRAP_CONTENT));
+        ab.setTitle(String.format("Movement speed: %d m/s", mSpeed));
+        ab.setPositiveButton("Go", new DialogInterface.OnClickListener(){
+
+            @Override
+            public void onClick(final DialogInterface dialog, final int which){
+                dialog.dismiss();
+                FakeLocationService.start(MainActivity.this, mSpeed, -1, mMarkers);
+            }
+        });
+        ab.setNegativeButton(android.R.string.cancel, new DialogInterface.OnClickListener(){
+
+            @Override
+            public void onClick(final DialogInterface dialog, final int which){
+                dialog.dismiss();
+            }
+        });
+
+        final AlertDialog alertDialog = ab.show();
+        seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
+
+            @Override
+            public void onProgressChanged(final SeekBar seekBar, final int progress, final boolean fromUser){
+                mSpeed = (1 + progress);
+                alertDialog.setTitle(String.format("Movement speed: %d m/s", mSpeed));
+            }
+
+            @Override
+            public void onStartTrackingTouch(final SeekBar seekBar){
+            }
+
+            @Override
+            public void onStopTrackingTouch(final SeekBar seekBar){
+            }
+        });
     }
 
     protected void pushFragment(Class<? extends Fragment> cls, Bundle args, final int rootID){
