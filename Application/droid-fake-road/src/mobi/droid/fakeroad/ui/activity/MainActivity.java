@@ -33,6 +33,8 @@ public class MainActivity extends BaseMapViewActivity{
     private LinkedList<LatLng> mMarkers = new LinkedList<LatLng>();
     ///
     private ProgressDialog mProgressDialog;
+    boolean calculateRoute = true; //TODO need add settings.
+
     private ActionBar.TabListener mTabListener = new ActionBar.TabListener(){
 
         @Override
@@ -122,16 +124,15 @@ public class MainActivity extends BaseMapViewActivity{
         if(mMarkers.size() > 1){
             int distance = (int) MapsHelper.distance(oldLast, aLatLng) / 2;
 
-            addDistanceMarker(aLatLng, oldLast, distance);
+            addDistanceMarker(distance, MapsHelper.calcLngLat(oldLast, distance, MapsHelper.bearing(oldLast, aLatLng)));
 
         }
     }
 
-    private void addDistanceMarker(final LatLng aLatLng, final LatLng aOldLast, final int aDistance){
+    private void addDistanceMarker(final int aDistance, final LatLng aPosition){
         MarkerOptions distanceMarker = new MarkerOptions();
 
-
-        distanceMarker.position(MapsHelper.calcLngLat(aOldLast, aDistance, MapsHelper.bearing(aOldLast, aLatLng)));
+        distanceMarker.position(aPosition);
         distanceMarker.draggable(false);
         distanceMarker.visible(true);
 
@@ -211,10 +212,8 @@ public class MainActivity extends BaseMapViewActivity{
                     polylineOptions.addAll(mRoutingPoints);
 
                     double distance = MapsHelper.distance(mRoutingPoints);
-                    addDistanceMarker(aTo,aFrom,  (int) distance);
+                    addDistanceMarker((int) distance, mRoutingPoints.get(mRoutingPoints.size() / 2));
                     mMap.addPolyline(polylineOptions);
-
-
 
                 }
             }
