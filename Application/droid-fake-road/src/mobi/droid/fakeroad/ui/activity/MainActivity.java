@@ -1,6 +1,7 @@
 package mobi.droid.fakeroad.ui.activity;
 
 import android.app.*;
+import android.content.DialogInterface;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
@@ -8,6 +9,9 @@ import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
+import android.view.ViewGroup;
+import android.widget.FrameLayout;
+import android.widget.SeekBar;
 import android.widget.Toast;
 import com.directions.route.RoutingListener;
 import com.google.android.gms.maps.CameraUpdateFactory;
@@ -16,6 +20,8 @@ import com.google.android.gms.maps.model.*;
 import com.google.maps.android.ui.IconGenerator;
 import mobi.droid.fakeroad.R;
 import mobi.droid.fakeroad.location.MapsHelper;
+import mobi.droid.fakeroad.service.FakeLocationService;
+import mobi.droid.fakeroad.ui.fragments.PathFragment;
 import mobi.droid.fakeroad.ui.fragments.SearchLocationFragment;
 
 import java.util.LinkedList;
@@ -23,25 +29,26 @@ import java.util.List;
 
 public class MainActivity extends BaseMapViewActivity{
 
-    public static final String TAG_ROUTE = "route";
-    public static final String TAG_PATH = "path";
-    boolean calculateRoute = true; //TODO need add settings.
     private IconGenerator mIconGenerator;
     ///
     private MarkerOptions mRouteStartMarkerOptions;
     private MarkerOptions mRouteEndMarkerOptions;
     private LinkedList<LatLng> mMarkers = new LinkedList<LatLng>();
+    private List<LatLng> mRoutingPoints;
     ///
     private ProgressDialog mProgressDialog;
-        private void cleanup(){
-            mMap.clear();
-            mMarkers.clear();
-            mRouteStartMarkerOptions = null;
-            mRouteEndMarkerOptions = null;
-            mRoutingPoints = null;
-        }
+    boolean calculateRoute = true; //TODO need add settings.
 
-    private List<LatLng> mRoutingPoints;
+
+    private int mSpeed;
+
+    private void cleanup(){
+        mMap.clear();
+        mMarkers.clear();
+        mRouteStartMarkerOptions = null;
+        mRouteEndMarkerOptions = null;
+        mRoutingPoints = null;
+    }
 
     @Override
     public void onCreate(final Bundle savedInstanceState){
@@ -224,10 +231,13 @@ public class MainActivity extends BaseMapViewActivity{
         // TODO
         switch(item.getItemId()){
             case R.id.action_new_route:
+                cleanup();
                 break;
             case R.id.action_start_route:
+                showSpeedDialog();
                 break;
             case R.id.action_stop_route:
+                FakeLocationService.stop(this);
                 break;
             case R.id.action_add_new_point:
 
@@ -235,6 +245,51 @@ public class MainActivity extends BaseMapViewActivity{
 
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    private void showSpeedDialog(){
+        mSpeed = 10;
+        AlertDialog.Builder ab = new AlertDialog.Builder(this);
+        final SeekBar seekBar = new SeekBar(this);
+        ab.setView(seekBar);
+        seekBar.setMax(99);
+        seekBar.setProgress(mSpeed);
+        seekBar.setLayoutParams(new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                                                             ViewGroup.LayoutParams.WRAP_CONTENT));
+        ab.setTitle(String.format("Movement speed: %d m/s", mSpeed));
+        ab.setPositiveButton("Go", new DialogInterface.OnClickListener(){
+
+            @Override
+            public void onClick(final DialogInterface dialog, final int which){
+                dialog.dismiss();
+                FakeLocationService.start(MainActivity.this, mSpeed, -1, mMarkers);
+            }
+        });
+        ab.setNegativeButton(android.R.string.cancel, new DialogInterface.OnClickListener(){
+
+            @Override
+            public void onClick(final DialogInterface dialog, final int which){
+                dialog.dismiss();
+            }
+        });
+
+        final AlertDialog alertDialog = ab.show();
+        seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
+
+            @Override
+            public void onProgressChanged(final SeekBar seekBar, final int progress, final boolean fromUser){
+                mSpeed = (1 + progress);
+                alertDialog.setTitle(String.format("Movement speed: %d m/s", mSpeed));
+            }
+
+            @Override
+            public void onStartTrackingTouch(final SeekBar seekBar){
+            }
+
+            @Override
+            public void onStopTrackingTouch(final SeekBar seekBar){
+            }
+        });
     }
 
     protected void pushFragment(Class<? extends Fragment> cls, Bundle args, final int rootID){
