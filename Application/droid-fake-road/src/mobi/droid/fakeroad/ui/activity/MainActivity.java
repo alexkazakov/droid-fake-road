@@ -241,16 +241,7 @@ public class MainActivity extends BaseMapViewActivity{
     @Override
     public boolean onCreateOptionsMenu(Menu menu){
         MenuInflater inflater = getMenuInflater();
-        //noinspection ConstantConditions
-        ActionBar.Tab selectedTab = getActionBar().getSelectedTab();
-        if(selectedTab != null){
-            Object tag = selectedTab.getTag();
-            if(TAG_ROUTE.equals(tag)){
-                inflater.inflate(R.menu.routing_menu, menu);
-            } else if(TAG_PATH.equals(tag)){
-                inflater.inflate(R.menu.path_menu, menu);
-            }
-        }
+        inflater.inflate(R.menu.routing_menu, menu);
         return true;
     }
 
@@ -259,15 +250,9 @@ public class MainActivity extends BaseMapViewActivity{
         // Handle item selection
         // TODO
         switch(item.getItemId()){
-            case R.id.action_new_path:
-                break;
             case R.id.action_new_route:
                 break;
-            case R.id.action_start_path:
-                break;
             case R.id.action_start_route:
-                break;
-            case R.id.action_stop_path:
                 break;
             case R.id.action_stop_route:
                 break;
