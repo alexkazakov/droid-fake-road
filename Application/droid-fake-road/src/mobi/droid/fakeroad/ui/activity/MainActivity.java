@@ -16,7 +16,6 @@ import com.google.android.gms.maps.model.*;
 import com.google.maps.android.ui.IconGenerator;
 import mobi.droid.fakeroad.R;
 import mobi.droid.fakeroad.location.MapsHelper;
-import mobi.droid.fakeroad.ui.fragments.PathFragment;
 import mobi.droid.fakeroad.ui.fragments.SearchLocationFragment;
 
 import java.util.LinkedList;
@@ -26,6 +25,7 @@ public class MainActivity extends BaseMapViewActivity{
 
     public static final String TAG_ROUTE = "route";
     public static final String TAG_PATH = "path";
+    boolean calculateRoute = true; //TODO need add settings.
     private IconGenerator mIconGenerator;
     ///
     private MarkerOptions mRouteStartMarkerOptions;
@@ -33,31 +33,6 @@ public class MainActivity extends BaseMapViewActivity{
     private LinkedList<LatLng> mMarkers = new LinkedList<LatLng>();
     ///
     private ProgressDialog mProgressDialog;
-    boolean calculateRoute = true; //TODO need add settings.
-
-    private ActionBar.TabListener mTabListener = new ActionBar.TabListener(){
-
-        @Override
-        public void onTabSelected(final ActionBar.Tab tab, final FragmentTransaction ft){
-            invalidateOptionsMenu();
-            cleanup();
-
-            if(tab.getTag().equals(TAG_ROUTE)){
-                pushFragment(SearchLocationFragment.class, null, R.id.fragmentHeader);
-            } else if(tab.getTag().equals(TAG_PATH)){
-                pushFragment(PathFragment.class, null, R.id.fragmentHeader);
-                if(mMap != null){
-                    mMap.setOnMapLongClickListener(new GoogleMap.OnMapLongClickListener(){
-
-                        @Override
-                        public void onMapLongClick(final LatLng aLatLng){
-                            onAddMarker(aLatLng);
-                        }
-                    });
-                }
-            }
-        }
-
         private void cleanup(){
             mMap.clear();
             mMarkers.clear();
@@ -66,31 +41,22 @@ public class MainActivity extends BaseMapViewActivity{
             mRoutingPoints = null;
         }
 
-        @Override
-        public void onTabUnselected(final ActionBar.Tab tab, final FragmentTransaction ft){
-            if(TAG_PATH.equals(tab.getTag())){
-                if(mMap != null){
-                    mMap.setOnMapLongClickListener(null);
-                }
-
-            }
-        }
-
-        @Override
-        public void onTabReselected(final ActionBar.Tab tab, final FragmentTransaction ft){
-        }
-    };
     private List<LatLng> mRoutingPoints;
 
     @Override
     public void onCreate(final Bundle savedInstanceState){
         super.onCreate(savedInstanceState);
 
-        ActionBar bar = getActionBar();
-        //noinspection ConstantConditions
-        bar.setNavigationMode(ActionBar.NAVIGATION_MODE_TABS);
-        bar.addTab(bar.newTab().setText("Routing (start+finish)").setTabListener(mTabListener).setTag(TAG_ROUTE));
-        bar.addTab(bar.newTab().setText("Path").setTabListener(mTabListener).setTag(TAG_PATH));
+        pushFragment(SearchLocationFragment.class, null, R.id.fragmentHeader);
+        if(mMap != null){
+            mMap.setOnMapLongClickListener(new GoogleMap.OnMapLongClickListener(){
+
+                @Override
+                public void onMapLongClick(final LatLng aLatLng){
+                    onAddMarker(aLatLng);
+                }
+            });
+        }
     }
 
     @Override
@@ -106,24 +72,29 @@ public class MainActivity extends BaseMapViewActivity{
     protected void onAddMarker(final LatLng aLatLng){
         MarkerOptions pointMarker = new MarkerOptions();
         pointMarker.draggable(false);
-        pointMarker.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_ORANGE));
+        if(mMarkers.isEmpty()){
+            pointMarker.icon(BitmapDescriptorFactory.fromResource(R.drawable.start_blue));
+
+        }
         pointMarker.position(aLatLng);
         pointMarker.visible(true);
         mMap.addMarker(pointMarker);
 
         if(!mMarkers.isEmpty()){
             LatLng last = mMarkers.getLast();
-
-            PolylineOptions polylineOptions = new PolylineOptions();
-            polylineOptions.add(last, aLatLng);
-            polylineOptions.width(5);
-            mMap.addPolyline(polylineOptions);
+            if(calculateRoute){
+                calculateRoute(aLatLng, last);
+            } else{
+                PolylineOptions polylineOptions = new PolylineOptions();
+                polylineOptions.add(last, aLatLng);
+                polylineOptions.width(5);
+                mMap.addPolyline(polylineOptions);
+            }
         }
         LatLng oldLast = mMarkers.peekLast();
         mMarkers.add(aLatLng);
         if(mMarkers.size() > 1){
             int distance = (int) MapsHelper.distance(oldLast, aLatLng) / 2;
-
             addDistanceMarker(distance, MapsHelper.calcLngLat(oldLast, distance, MapsHelper.bearing(oldLast, aLatLng)));
 
         }
@@ -176,6 +147,10 @@ public class MainActivity extends BaseMapViewActivity{
             @Override
             public void onRoutingFailure(){
                 hideProgress();
+                PolylineOptions polylineOptions = new PolylineOptions();
+                polylineOptions.add(aFrom, aTo);
+                polylineOptions.width(5);
+                mMap.addPolyline(polylineOptions);
                 Toast.makeText(MainActivity.this, "Failed to determine routing", Toast.LENGTH_SHORT).show();
             }
 
@@ -189,20 +164,19 @@ public class MainActivity extends BaseMapViewActivity{
             public void onRoutingSuccess(final PolylineOptions aPolyOptions){
                 hideProgress();
                 if(mMap != null){
-                    mMap.clear();
+//                    mMap.clear();
 
-                    // Start marker
-                    MarkerOptions options = new MarkerOptions();
-                    options.position(aFrom);
-                    options.icon(BitmapDescriptorFactory.fromResource(R.drawable.start_blue));
-                    mMap.addMarker(options);
-
-                    // End marker
-                    options.position(aTo);
-                    options.icon(BitmapDescriptorFactory.fromResource(R.drawable.end_green));
-                    mMap.addMarker(options);
+//                    // Start marker
+//                    MarkerOptions options = new MarkerOptions();
+//                    options.position(aFrom);
+//                    options.icon(BitmapDescriptorFactory.fromResource(R.drawable.start_blue));
+//                    mMap.addMarker(options);
+//
+//                    // End marker
+//                    options.position(aTo);
+//                    options.icon(BitmapDescriptorFactory.fromResource(R.drawable.end_green));
+//                    mMap.addMarker(options);
                     LatLngBounds.Builder include = LatLngBounds.builder().include(aFrom).include(aTo);
-
                     mMap.moveCamera(CameraUpdateFactory.newLatLngBounds(include.build(), 25));
 
                     PolylineOptions polylineOptions = new PolylineOptions();
@@ -255,6 +229,10 @@ public class MainActivity extends BaseMapViewActivity{
                 break;
             case R.id.action_stop_route:
                 break;
+            case R.id.action_add_new_point:
+
+                break;
+
         }
         return super.onOptionsItemSelected(item);
     }

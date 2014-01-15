@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
-
+    <item
+            android:id="@+id/action_add_new_point"
+            android:title="@string/new_point"
+            android:icon="@android:drawable/ic_menu_add"
+            android:showAsAction="ifRoom|withText"/>
 
     <item
             android:id="@+id/action_start_route"
