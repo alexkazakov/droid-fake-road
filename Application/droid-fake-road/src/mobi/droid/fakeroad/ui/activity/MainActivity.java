@@ -12,10 +12,7 @@ import android.widget.Toast;
 import com.directions.route.RoutingListener;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
-import com.google.android.gms.maps.model.BitmapDescriptorFactory;
-import com.google.android.gms.maps.model.LatLng;
-import com.google.android.gms.maps.model.MarkerOptions;
-import com.google.android.gms.maps.model.PolylineOptions;
+import com.google.android.gms.maps.model.*;
 import com.google.maps.android.ui.IconGenerator;
 import mobi.droid.fakeroad.R;
 import mobi.droid.fakeroad.location.MapsHelper;
@@ -123,19 +120,27 @@ public class MainActivity extends BaseMapViewActivity{
         LatLng oldLast = mMarkers.peekLast();
         mMarkers.add(aLatLng);
         if(mMarkers.size() > 1){
-            MarkerOptions distanceMarker = new MarkerOptions();
             int distance = (int) MapsHelper.distance(oldLast, aLatLng) / 2;
-            distanceMarker.position(MapsHelper.calcLngLat(oldLast, distance, MapsHelper.bearing(oldLast, aLatLng)));
-            distanceMarker.draggable(false);
-            distanceMarker.visible(true);
 
-            String text = distance < 1000 ?
-                    String.valueOf(distance) + " m" :
-                    String.valueOf(distance / 1000) + "." + String.valueOf(distance % 1000) + " km";
-            Bitmap icon = mIconGenerator.makeIcon(text);
-            distanceMarker.icon(BitmapDescriptorFactory.fromBitmap(icon));
-            mMap.addMarker(distanceMarker);
+            addDistanceMarker(aLatLng, oldLast, distance);
+
         }
+    }
+
+    private void addDistanceMarker(final LatLng aLatLng, final LatLng aOldLast, final int aDistance){
+        MarkerOptions distanceMarker = new MarkerOptions();
+
+
+        distanceMarker.position(MapsHelper.calcLngLat(aOldLast, aDistance, MapsHelper.bearing(aOldLast, aLatLng)));
+        distanceMarker.draggable(false);
+        distanceMarker.visible(true);
+
+        String text = aDistance < 1000 ?
+                String.valueOf(aDistance) + " m" :
+                String.valueOf(aDistance / 1000) + "." + String.valueOf(aDistance % 1000) + " km";
+        Bitmap icon = mIconGenerator.makeIcon(text);
+        distanceMarker.icon(BitmapDescriptorFactory.fromBitmap(icon));
+        mMap.addMarker(distanceMarker);
     }
 
     public void addMarkerStart(LatLng aLatLng){
@@ -195,16 +200,22 @@ public class MainActivity extends BaseMapViewActivity{
                     options.position(aTo);
                     options.icon(BitmapDescriptorFactory.fromResource(R.drawable.end_green));
                     mMap.addMarker(options);
-                    mMap.moveCamera(CameraUpdateFactory.newLatLng(aTo));
+                    LatLngBounds.Builder include = LatLngBounds.builder().include(aFrom).include(aTo);
+
+                    mMap.moveCamera(CameraUpdateFactory.newLatLngBounds(include.build(), 25));
 
                     PolylineOptions polylineOptions = new PolylineOptions();
                     polylineOptions.color(Color.BLUE);
                     polylineOptions.width(10);
-
                     mRoutingPoints = aPolyOptions.getPoints();
                     polylineOptions.addAll(mRoutingPoints);
 
+                    double distance = MapsHelper.distance(mRoutingPoints);
+                    addDistanceMarker(aTo,aFrom,  (int) distance);
                     mMap.addPolyline(polylineOptions);
+
+
+
                 }
             }
         });
