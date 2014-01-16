@@ -2,6 +2,7 @@ package mobi.droid.fakeroad.ui.activity;
 
 import android.app.*;
 import android.content.DialogInterface;
+import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
@@ -28,12 +29,14 @@ import java.util.*;
 
 public class MainActivity extends BaseMapViewActivity{
 
+    public static final String APP_PREFERENCES = "map";
+    public static final String PREF_DIRECTION_CALCULATE = "direction.calculate";
     private IconGenerator mIconGenerator;
     private LinkedList<LatLng> mMarkers = new LinkedList<LatLng>();
     ///
     private ProgressDialog mProgressDialog;
     private Routing.TravelMode mTravelMode = Routing.TravelMode.DRIVING;
-    private boolean mDirectionCalculate = true; //TODO need add settings.
+    private boolean mDirectionCalculate = true;
 
     private int mSpeed;
 
@@ -50,6 +53,8 @@ public class MainActivity extends BaseMapViewActivity{
     public void onCreate(final Bundle savedInstanceState){
         super.onCreate(savedInstanceState);
 
+        restorePreferences();
+
         getActionBar().setDisplayOptions(0, ActionBar.DISPLAY_SHOW_TITLE);
 
         pushFragment(SearchLocationFragment.class, null, R.id.fragmentHeader);
@@ -62,6 +67,11 @@ public class MainActivity extends BaseMapViewActivity{
                 }
             });
         }
+    }
+
+    private void restorePreferences(){
+        SharedPreferences prefs = getSharedPreferences(APP_PREFERENCES, MODE_PRIVATE);
+        mDirectionCalculate = prefs.getBoolean(PREF_DIRECTION_CALCULATE, true);
     }
 
     @Override
@@ -85,7 +95,8 @@ public class MainActivity extends BaseMapViewActivity{
                 calculateRoute(mColor, last, aLatLng);
             } else{
                 addRouteLine(mColor, last, aLatLng);
-                addDistanceMarker(mColor, distance, MapsHelper.calcLngLat(oldLast, distance, MapsHelper.bearing(oldLast, aLatLng)));
+                addDistanceMarker(mColor, distance, MapsHelper.calcLngLat(oldLast, distance,
+                                                                          MapsHelper.bearing(oldLast, aLatLng)));
             }
         }
         mMarkers.add(aLatLng);
@@ -145,10 +156,11 @@ public class MainActivity extends BaseMapViewActivity{
             public void onRoutingFailure(){
                 hideProgress();
 
-                addRouteLine(aColor,aFrom, aTo);
+                addRouteLine(aColor, aFrom, aTo);
 
                 int distance = (int) MapsHelper.distance(aFrom, aTo) / 2;
-                addDistanceMarker(aColor, distance, MapsHelper.calcLngLat(aFrom, distance, MapsHelper.bearing(aFrom, aTo)));
+                addDistanceMarker(aColor, distance,
+                                  MapsHelper.calcLngLat(aFrom, distance, MapsHelper.bearing(aFrom, aTo)));
 
                 Toast.makeText(MainActivity.this, "Failed to determine routing", Toast.LENGTH_SHORT).show();
             }
@@ -170,12 +182,11 @@ public class MainActivity extends BaseMapViewActivity{
 
                     List<LatLng> sortedPoints = new ArrayList<LatLng>();
                     HashSet<LatLng> pointSet = new HashSet<LatLng>();
-                    for(LatLng latLng: routingPoints){
+                    for(LatLng latLng : routingPoints){
                         if(pointSet.add(latLng)){
                             sortedPoints.add(latLng);
                         }
                     }
-
 
                     mMarkers.addAll(sortedPoints);
 
@@ -195,8 +206,7 @@ public class MainActivity extends BaseMapViewActivity{
         pointMarker.draggable(false);
         if(mMarkers.isEmpty()){
             pointMarker.icon(BitmapDescriptorFactory.fromResource(R.drawable.start_blue));
-        }
-        else {
+        } else{
             float[] hsv = new float[3];
             Color.colorToHSV(aColor, hsv);
             pointMarker.icon(BitmapDescriptorFactory.defaultMarker(hsv[0]));
@@ -209,7 +219,15 @@ public class MainActivity extends BaseMapViewActivity{
     @Override
     public void onPause(){
         hideProgress();
+
+        savePreferences();
+
         super.onPause();
+    }
+
+    private void savePreferences(){
+        SharedPreferences prefs = getSharedPreferences(APP_PREFERENCES, MODE_PRIVATE);
+        prefs.edit().putBoolean(PREF_DIRECTION_CALCULATE, mDirectionCalculate).apply();
     }
 
     private void showProgress(final String aMessage){
@@ -248,7 +266,8 @@ public class MainActivity extends BaseMapViewActivity{
             case R.id.action_add_new_point:
                 return true;
             case R.id.action_autocalculate_direction:
-                mDirectionCalculate = !item.isChecked();
+                final boolean directionCalculate = !item.isChecked();
+                mDirectionCalculate = directionCalculate;
                 invalidateOptionsMenu();
                 return true;
             case R.id.direction_biking:
