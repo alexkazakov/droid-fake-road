@@ -6,11 +6,10 @@ import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
+import android.location.Address;
 import android.os.Bundle;
-import android.view.Menu;
-import android.view.MenuInflater;
-import android.view.MenuItem;
-import android.view.ViewGroup;
+import android.view.*;
+import android.widget.AdapterView;
 import android.widget.FrameLayout;
 import android.widget.SeekBar;
 import android.widget.Toast;
@@ -23,7 +22,7 @@ import com.google.maps.android.ui.IconGenerator;
 import mobi.droid.fakeroad.R;
 import mobi.droid.fakeroad.location.MapsHelper;
 import mobi.droid.fakeroad.service.FakeLocationService;
-import mobi.droid.fakeroad.ui.fragments.SearchLocationFragment;
+import mobi.droid.fakeroad.ui.view.AutoCompleteAddressTextView;
 
 import java.util.*;
 
@@ -57,7 +56,6 @@ public class MainActivity extends BaseMapViewActivity{
 
         getActionBar().setDisplayOptions(0, ActionBar.DISPLAY_SHOW_TITLE);
 
-        pushFragment(SearchLocationFragment.class, null, R.id.fragmentHeader);
         if(mMap != null){
             mMap.setOnMapLongClickListener(new GoogleMap.OnMapLongClickListener(){
 
@@ -264,6 +262,7 @@ public class MainActivity extends BaseMapViewActivity{
                 FakeLocationService.stop(this);
                 return true;
             case R.id.action_add_new_point:
+                promptPoint();
                 return true;
             case R.id.action_autocalculate_direction:
                 final boolean directionCalculate = !item.isChecked();
@@ -288,6 +287,34 @@ public class MainActivity extends BaseMapViewActivity{
 
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    private void promptPoint(){
+        AlertDialog.Builder ab = new AlertDialog.Builder(this);
+        ab.setTitle("Input address of point");
+        AutoCompleteAddressTextView tvAddress = new AutoCompleteAddressTextView(this);
+        tvAddress.setLayoutParams(new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                                                               ViewGroup.LayoutParams.WRAP_CONTENT));
+        tvAddress.setPadding(4, 20, 2, 4);
+        ab.setView(tvAddress);
+        ab.setNeutralButton(android.R.string.cancel, new DialogInterface.OnClickListener(){
+
+            @Override
+            public void onClick(final DialogInterface dialog, final int which){
+                dialog.dismiss();
+            }
+        });
+        final AlertDialog dialog = ab.show();
+        tvAddress.setOnItemClickListener(new AdapterView.OnItemClickListener(){
+
+            @Override
+            public void onItemClick(final AdapterView<?> parent, final View view, final int position, final long id){
+                dialog.dismiss();
+                Address point = (Address) parent.getItemAtPosition(position);
+                onAddMarker(new LatLng(point.getLatitude(), point.getLongitude()));
+            }
+        });
+
     }
 
     @SuppressWarnings("ConstantConditions")
