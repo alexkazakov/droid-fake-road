@@ -30,6 +30,7 @@ public class MainActivity extends BaseMapViewActivity{
 
     public static final String APP_PREFERENCES = "map";
     public static final String PREF_DIRECTION_CALCULATE = "direction.calculate";
+    public static final String PREF_DIRECTION_TRAVELMODE = "direction.travelmode";
     private IconGenerator mIconGenerator;
     private LinkedList<LatLng> mMarkers = new LinkedList<LatLng>();
     ///
@@ -40,11 +41,13 @@ public class MainActivity extends BaseMapViewActivity{
     private int mSpeed;
 
     private Random mColorRandom = new Random(Color.BLUE);
-    private int mColor;
+    private int mTotalDistance;
 
     private void cleanup(){
         mMap.clear();
         mMarkers.clear();
+        mTotalDistance = 0;
+        mColorRandom = new Random(Color.BLUE);
     }
 
     @SuppressWarnings("ConstantConditions")
@@ -54,7 +57,8 @@ public class MainActivity extends BaseMapViewActivity{
 
         restorePreferences();
 
-        getActionBar().setDisplayOptions(0, ActionBar.DISPLAY_SHOW_TITLE);
+        getActionBar().setDisplayOptions(0, ActionBar.DISPLAY_SHOW_HOME);
+        setTitle(appendToFullDistance(0));
 
         if(mMap != null){
             mMap.setOnMapLongClickListener(new GoogleMap.OnMapLongClickListener(){
@@ -67,9 +71,15 @@ public class MainActivity extends BaseMapViewActivity{
         }
     }
 
+    private String appendToFullDistance(final int aDistance){
+        mTotalDistance += aDistance;
+        return "Total: " + makeDistanceString(mMarkers.isEmpty() ? 0 : mTotalDistance);
+    }
+
     private void restorePreferences(){
         SharedPreferences prefs = getSharedPreferences(APP_PREFERENCES, MODE_PRIVATE);
         mDirectionCalculate = prefs.getBoolean(PREF_DIRECTION_CALCULATE, true);
+        mTravelMode = Routing.TravelMode.valueOf(prefs.getString(PREF_DIRECTION_TRAVELMODE, Routing.TravelMode.DRIVING.name()));
     }
 
     @Override
@@ -82,19 +92,19 @@ public class MainActivity extends BaseMapViewActivity{
 
     @Override
     protected void onAddMarker(final LatLng aLatLng){
-        mColor = Color.argb(255, mColorRandom.nextInt(256), mColorRandom.nextInt(256), mColorRandom.nextInt(256));
+        int color = Color.argb(255, mColorRandom.nextInt(256), mColorRandom.nextInt(256), mColorRandom.nextInt(256));
         LatLng oldLast = mMarkers.peekLast();
         int distance = oldLast == null ? 0 : (int) MapsHelper.distance(oldLast, aLatLng) / 2;
-        addPointToMap(aLatLng, mColor, distance);
+        addPointToMap(aLatLng, color, distance);
 
         if(!mMarkers.isEmpty()){
             LatLng last = mMarkers.getLast();
             if(mDirectionCalculate){
-                calculateRoute(mColor, last, aLatLng);
+                calculateRoute(color, last, aLatLng);
             } else{
-                addRouteLine(mColor, last, aLatLng);
-                addDistanceMarker(mColor, distance, MapsHelper.calcLngLat(oldLast, distance,
-                                                                          MapsHelper.bearing(oldLast, aLatLng)));
+                addRouteLine(color, last, aLatLng);
+                addDistanceMarker(color, distance, MapsHelper.calcLngLat(oldLast, distance,
+                                                                         MapsHelper.bearing(oldLast, aLatLng)));
             }
         }
         mMarkers.add(aLatLng);
@@ -121,30 +131,14 @@ public class MainActivity extends BaseMapViewActivity{
         Bitmap icon = mIconGenerator.makeIcon(text);
         distanceMarker.icon(BitmapDescriptorFactory.fromBitmap(icon));
         mMap.addMarker(distanceMarker);
+
+        setTitle(appendToFullDistance(aDistance));
     }
 
     private static String makeDistanceString(final int aDistance){
         return aDistance < 1000 ?
                 String.valueOf(aDistance) + " m" :
                 String.valueOf(aDistance / 1000) + "." + String.valueOf((aDistance % 1000) / 10) + " km";
-    }
-
-    public void addMarkerStart(LatLng aLatLng){
-        // Start marker
-        double distance = mMarkers.peekLast() == null ? 0 : MapsHelper.distance(mMarkers.peekLast(), aLatLng);
-        addPointToMap(aLatLng, mColor, (int) distance);
-        mMap.moveCamera(CameraUpdateFactory.newLatLng(aLatLng));
-    }
-
-    public void addMarkerEnd(LatLng aLatLng){
-        // End marker
-        double distance = mMarkers.peekLast() == null ? 0 : MapsHelper.distance(mMarkers.peekLast(), aLatLng);
-        addPointToMap(aLatLng, mColor, (int) distance);
-        mMap.moveCamera(CameraUpdateFactory.newLatLng(aLatLng));
-    }
-
-    public int getColor(){
-        return mColor;
     }
 
     public void calculateRoute(final int aColor, final LatLng aFrom, final LatLng aTo){
@@ -225,7 +219,11 @@ public class MainActivity extends BaseMapViewActivity{
 
     private void savePreferences(){
         SharedPreferences prefs = getSharedPreferences(APP_PREFERENCES, MODE_PRIVATE);
-        prefs.edit().putBoolean(PREF_DIRECTION_CALCULATE, mDirectionCalculate).apply();
+        SharedPreferences.Editor edit = prefs.edit();
+        edit.
+                putBoolean(PREF_DIRECTION_CALCULATE, mDirectionCalculate).
+                putString(PREF_DIRECTION_TRAVELMODE, mTravelMode.name()).
+                apply();
     }
 
     private void showProgress(final String aMessage){
@@ -254,6 +252,7 @@ public class MainActivity extends BaseMapViewActivity{
         switch(item.getItemId()){
             case R.id.action_new_route:
                 cleanup();
+                setTitle(appendToFullDistance(0));
                 return true;
             case R.id.action_start_route:
                 showSpeedDialog();
@@ -265,8 +264,7 @@ public class MainActivity extends BaseMapViewActivity{
                 promptPoint();
                 return true;
             case R.id.action_autocalculate_direction:
-                final boolean directionCalculate = !item.isChecked();
-                mDirectionCalculate = directionCalculate;
+                mDirectionCalculate = !item.isChecked();
                 invalidateOptionsMenu();
                 return true;
             case R.id.direction_biking:

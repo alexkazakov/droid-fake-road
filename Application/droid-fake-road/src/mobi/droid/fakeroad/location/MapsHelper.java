@@ -48,11 +48,14 @@ public class MapsHelper{
     public static double distance(Collection<LatLng> locations){
         double result = 0;
         Iterator<LatLng> iterator = locations.iterator();
-        while(iterator.hasNext()){
-            final LatLng p1 = iterator.next();
-            if(iterator.hasNext()){
-                final LatLng p2 = iterator.next();
+        if(iterator.hasNext()){
+            LatLng p1 = iterator.next();
+            while(iterator.hasNext()){
+                LatLng p2 = iterator.next();
                 result += distance(p1, p2);
+                if(iterator.hasNext()){
+                    p1 = p2;
+                }
             }
         }
         return result;
