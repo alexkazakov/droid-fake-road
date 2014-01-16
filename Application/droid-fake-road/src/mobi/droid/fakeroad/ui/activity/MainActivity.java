@@ -13,6 +13,7 @@ import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.SeekBar;
 import android.widget.Toast;
+import com.directions.route.Routing;
 import com.directions.route.RoutingListener;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
@@ -21,37 +22,35 @@ import com.google.maps.android.ui.IconGenerator;
 import mobi.droid.fakeroad.R;
 import mobi.droid.fakeroad.location.MapsHelper;
 import mobi.droid.fakeroad.service.FakeLocationService;
-import mobi.droid.fakeroad.ui.fragments.PathFragment;
 import mobi.droid.fakeroad.ui.fragments.SearchLocationFragment;
 
-import java.util.LinkedList;
-import java.util.List;
+import java.util.*;
 
 public class MainActivity extends BaseMapViewActivity{
 
     private IconGenerator mIconGenerator;
-    ///
-    private MarkerOptions mRouteStartMarkerOptions;
-    private MarkerOptions mRouteEndMarkerOptions;
     private LinkedList<LatLng> mMarkers = new LinkedList<LatLng>();
-
     ///
     private ProgressDialog mProgressDialog;
-    boolean calculateRoute = true; //TODO need add settings.
-
+    private Routing.TravelMode mTravelMode = Routing.TravelMode.DRIVING;
+    private boolean mDirectionCalculate = true; //TODO need add settings.
 
     private int mSpeed;
+
+    private Random mColorRandom = new Random(Color.BLUE);
+    private int mColor;
 
     private void cleanup(){
         mMap.clear();
         mMarkers.clear();
-        mRouteStartMarkerOptions = null;
-        mRouteEndMarkerOptions = null;
     }
 
+    @SuppressWarnings("ConstantConditions")
     @Override
     public void onCreate(final Bundle savedInstanceState){
         super.onCreate(savedInstanceState);
+
+        getActionBar().setDisplayOptions(0, ActionBar.DISPLAY_SHOW_TITLE);
 
         pushFragment(SearchLocationFragment.class, null, R.id.fragmentHeader);
         if(mMap != null){
@@ -70,93 +69,87 @@ public class MainActivity extends BaseMapViewActivity{
         super.configureMap(savedInstanceState);
 
         mIconGenerator = new IconGenerator(this);
-        mIconGenerator.setBackground(new ColorDrawable(Color.LTGRAY));
         mIconGenerator.setContentPadding(2, 2, 2, 2);
     }
 
     @Override
     protected void onAddMarker(final LatLng aLatLng){
-        MarkerOptions pointMarker = new MarkerOptions();
-        pointMarker.draggable(false);
-        if(mMarkers.isEmpty()){
-            pointMarker.icon(BitmapDescriptorFactory.fromResource(R.drawable.start_blue));
-
-        }
-        pointMarker.position(aLatLng);
-        pointMarker.visible(true);
-        mMap.addMarker(pointMarker);
+        mColor = Color.argb(255, mColorRandom.nextInt(256), mColorRandom.nextInt(256), mColorRandom.nextInt(256));
+        LatLng oldLast = mMarkers.peekLast();
+        int distance = oldLast == null ? 0 : (int) MapsHelper.distance(oldLast, aLatLng) / 2;
+        addPointToMap(aLatLng, mColor, distance);
 
         if(!mMarkers.isEmpty()){
             LatLng last = mMarkers.getLast();
-            if(calculateRoute){
-                calculateRoute(aLatLng, last);
+            if(mDirectionCalculate){
+                calculateRoute(mColor, last, aLatLng);
             } else{
-                PolylineOptions polylineOptions = new PolylineOptions();
-                polylineOptions.add(last, aLatLng);
-                polylineOptions.width(5);
-                mMap.addPolyline(polylineOptions);
+                addRouteLine(mColor, last, aLatLng);
+                addDistanceMarker(mColor, distance, MapsHelper.calcLngLat(oldLast, distance, MapsHelper.bearing(oldLast, aLatLng)));
             }
         }
-        LatLng oldLast = mMarkers.peekLast();
         mMarkers.add(aLatLng);
-        if(mMarkers.size() > 1){
-            int distance = (int) MapsHelper.distance(oldLast, aLatLng) / 2;
-            addDistanceMarker(distance, MapsHelper.calcLngLat(oldLast, distance, MapsHelper.bearing(oldLast, aLatLng)));
-
-        }
     }
 
-    private void addDistanceMarker(final int aDistance, final LatLng aPosition){
+    private void addRouteLine(final int aColor, final LatLng... aLatLng){
+        PolylineOptions polylineOptions = new PolylineOptions();
+        polylineOptions.add(aLatLng);
+        polylineOptions.width(4);
+        polylineOptions.color(aColor);
+        mMap.addPolyline(polylineOptions);
+    }
+
+    private void addDistanceMarker(final int aColor, final int aDistance, final LatLng aPosition){
         MarkerOptions distanceMarker = new MarkerOptions();
 
         distanceMarker.position(aPosition);
         distanceMarker.draggable(false);
         distanceMarker.visible(true);
 
-        String text = aDistance < 1000 ?
-                String.valueOf(aDistance) + " m" :
-                String.valueOf(aDistance / 1000) + "." + String.valueOf(aDistance % 1000) + " km";
+        String text = makeDistanceString(aDistance);
+        mIconGenerator.setBackground(new ColorDrawable(aColor));
+        mIconGenerator.setTextAppearance(android.R.style.TextAppearance_DeviceDefault_Widget_IconMenu_Item);
         Bitmap icon = mIconGenerator.makeIcon(text);
         distanceMarker.icon(BitmapDescriptorFactory.fromBitmap(icon));
         mMap.addMarker(distanceMarker);
     }
 
+    private static String makeDistanceString(final int aDistance){
+        return aDistance < 1000 ?
+                String.valueOf(aDistance) + " m" :
+                String.valueOf(aDistance / 1000) + "." + String.valueOf((aDistance % 1000) / 10) + " km";
+    }
+
     public void addMarkerStart(LatLng aLatLng){
         // Start marker
-        if(mRouteStartMarkerOptions != null){
-            mRouteStartMarkerOptions.visible(false);
-        }
-        mRouteStartMarkerOptions = new MarkerOptions();
-        mRouteStartMarkerOptions.position(aLatLng);
-        mRouteStartMarkerOptions.icon(BitmapDescriptorFactory.fromResource(R.drawable.start_blue));
-
-        mMap.addMarker(mRouteStartMarkerOptions);
+        double distance = mMarkers.peekLast() == null ? 0 : MapsHelper.distance(mMarkers.peekLast(), aLatLng);
+        addPointToMap(aLatLng, mColor, (int) distance);
         mMap.moveCamera(CameraUpdateFactory.newLatLng(aLatLng));
     }
 
     public void addMarkerEnd(LatLng aLatLng){
         // End marker
-        if(mRouteEndMarkerOptions != null){
-            mRouteEndMarkerOptions.visible(false);
-        }
-        mRouteEndMarkerOptions = new MarkerOptions();
-        mRouteEndMarkerOptions.position(aLatLng);
-        mRouteEndMarkerOptions.icon(BitmapDescriptorFactory.fromResource(R.drawable.end_green));
-
-        mMap.addMarker(mRouteEndMarkerOptions);
+        double distance = mMarkers.peekLast() == null ? 0 : MapsHelper.distance(mMarkers.peekLast(), aLatLng);
+        addPointToMap(aLatLng, mColor, (int) distance);
         mMap.moveCamera(CameraUpdateFactory.newLatLng(aLatLng));
     }
 
-    public void calculateRoute(final LatLng aFrom, final LatLng aTo){
+    public int getColor(){
+        return mColor;
+    }
+
+    public void calculateRoute(final int aColor, final LatLng aFrom, final LatLng aTo){
         MapsHelper.calculateRoute(aFrom, aTo, new RoutingListener(){
 
             @Override
             public void onRoutingFailure(){
                 hideProgress();
-                PolylineOptions polylineOptions = new PolylineOptions();
-                polylineOptions.add(aFrom, aTo);
-                polylineOptions.width(5);
-                mMap.addPolyline(polylineOptions);
+
+                addRouteLine(aColor,aFrom, aTo);
+
+                int distance = (int) MapsHelper.distance(aFrom, aTo) / 2;
+                addDistanceMarker(aColor, distance, MapsHelper.calcLngLat(aFrom, distance, MapsHelper.bearing(aFrom, aTo)));
+
                 Toast.makeText(MainActivity.this, "Failed to determine routing", Toast.LENGTH_SHORT).show();
             }
 
@@ -170,36 +163,47 @@ public class MainActivity extends BaseMapViewActivity{
             public void onRoutingSuccess(final PolylineOptions aPolyOptions){
                 hideProgress();
                 if(mMap != null){
-//                    mMap.clear();
-
-//                    // Start marker
-//                    MarkerOptions options = new MarkerOptions();
-//                    options.position(aFrom);
-//                    options.icon(BitmapDescriptorFactory.fromResource(R.drawable.start_blue));
-//                    mMap.addMarker(options);
-//
-//                    // End marker
-//                    options.position(aTo);
-//                    options.icon(BitmapDescriptorFactory.fromResource(R.drawable.end_green));
-//                    mMap.addMarker(options);
                     LatLngBounds.Builder include = LatLngBounds.builder().include(aFrom).include(aTo);
                     mMap.moveCamera(CameraUpdateFactory.newLatLngBounds(include.build(), 25));
 
-                    PolylineOptions polylineOptions = new PolylineOptions();
-                    polylineOptions.color(Color.BLUE);
-                    polylineOptions.width(10);
-                    List<LatLng> mRoutingPoints = aPolyOptions.getPoints();
-                    polylineOptions.addAll(mRoutingPoints);
+                    List<LatLng> routingPoints = aPolyOptions.getPoints();
 
-                    mMarkers.addAll(mRoutingPoints);
+                    List<LatLng> sortedPoints = new ArrayList<LatLng>();
+                    HashSet<LatLng> pointSet = new HashSet<LatLng>();
+                    for(LatLng latLng: routingPoints){
+                        if(pointSet.add(latLng)){
+                            sortedPoints.add(latLng);
+                        }
+                    }
 
-                    double distance = MapsHelper.distance(mRoutingPoints);
-                    addDistanceMarker((int) distance, mRoutingPoints.get(mRoutingPoints.size() / 2));
-                    mMap.addPolyline(polylineOptions);
+
+                    mMarkers.addAll(sortedPoints);
+
+                    addRouteLine(aColor, sortedPoints.toArray(new LatLng[sortedPoints.size()]));
+
+                    double distance = MapsHelper.distance(sortedPoints);
+                    LatLng centerPoint = sortedPoints.get(sortedPoints.size() / 2);
+                    addDistanceMarker(aColor, (int) distance, centerPoint);
 
                 }
             }
         });
+    }
+
+    private void addPointToMap(final LatLng aLatLng, final int aColor, final int aDistance){
+        MarkerOptions pointMarker = new MarkerOptions();
+        pointMarker.draggable(false);
+        if(mMarkers.isEmpty()){
+            pointMarker.icon(BitmapDescriptorFactory.fromResource(R.drawable.start_blue));
+        }
+        else {
+            float[] hsv = new float[3];
+            Color.colorToHSV(aColor, hsv);
+            pointMarker.icon(BitmapDescriptorFactory.defaultMarker(hsv[0]));
+        }
+        pointMarker.position(aLatLng);
+        pointMarker.visible(true);
+        mMap.addMarker(pointMarker);
     }
 
     @Override
@@ -219,6 +223,7 @@ public class MainActivity extends BaseMapViewActivity{
         }
     }
 
+    @SuppressWarnings("ConstantConditions")
     @Override
     public boolean onCreateOptionsMenu(Menu menu){
         MenuInflater inflater = getMenuInflater();
@@ -233,19 +238,64 @@ public class MainActivity extends BaseMapViewActivity{
         switch(item.getItemId()){
             case R.id.action_new_route:
                 cleanup();
-                break;
+                return true;
             case R.id.action_start_route:
                 showSpeedDialog();
-                break;
+                return true;
             case R.id.action_stop_route:
                 FakeLocationService.stop(this);
-                break;
+                return true;
             case R.id.action_add_new_point:
-
-                break;
+                return true;
+            case R.id.action_autocalculate_direction:
+                mDirectionCalculate = !item.isChecked();
+                invalidateOptionsMenu();
+                return true;
+            case R.id.direction_biking:
+                item.setChecked(!item.isChecked());
+                mTravelMode = Routing.TravelMode.BIKING;
+                invalidateOptionsMenu();
+                return true;
+            case R.id.direction_driving:
+                item.setChecked(!item.isChecked());
+                mTravelMode = Routing.TravelMode.DRIVING;
+                invalidateOptionsMenu();
+                return true;
+            case R.id.direction_walking:
+                item.setChecked(!item.isChecked());
+                mTravelMode = Routing.TravelMode.WALKING;
+                invalidateOptionsMenu();
+                return true;
 
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    @SuppressWarnings("ConstantConditions")
+    @Override
+    public boolean onPrepareOptionsMenu(final Menu menu){
+        menu.findItem(R.id.action_autocalculate_direction).setChecked(mDirectionCalculate);
+        // direction travel types
+        menu.findItem(R.id.action_direction).getSubMenu().setGroupEnabled(R.id.action_group_direction_settings,
+                                                                          mDirectionCalculate);
+        switch(mTravelMode){
+            case WALKING:
+                menu.findItem(R.id.direction_walking).setChecked(true);
+                break;
+            case DRIVING:
+                menu.findItem(R.id.direction_driving).setChecked(true);
+                break;
+            case BIKING:
+                menu.findItem(R.id.direction_biking).setChecked(true);
+                break;
+        }
+
+        if(mDirectionCalculate){
+            menu.findItem(R.id.action_direction).setTitle("Pathfinding: " + mTravelMode.name());
+        } else{
+            menu.findItem(R.id.action_direction).setTitle("Pathfinding: OFF");
+        }
+        return true;
     }
 
     private void showSpeedDialog(){

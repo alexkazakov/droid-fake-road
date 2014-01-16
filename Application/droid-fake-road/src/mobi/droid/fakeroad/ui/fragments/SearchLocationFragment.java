@@ -75,7 +75,7 @@ public class SearchLocationFragment extends Fragment implements View.OnClickList
 
     private void calculateRoute(){
         if(mTo != null && mFrom != null){
-            mMainActivity.calculateRoute(new LatLng(mFrom.getLatitude(), mFrom.getLongitude()),
+            mMainActivity.calculateRoute(mMainActivity.getColor(), new LatLng(mFrom.getLatitude(), mFrom.getLongitude()),
                                          new LatLng(mTo.getLatitude(), mTo.getLongitude()));
         }
     }

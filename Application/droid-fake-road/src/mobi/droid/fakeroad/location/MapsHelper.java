@@ -12,6 +12,8 @@ import com.directions.route.Routing;
 import com.directions.route.RoutingListener;
 import com.google.android.gms.maps.model.LatLng;
 
+import java.util.Collection;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -43,10 +45,15 @@ public class MapsHelper{
      * Calculate the distance between all points in a line. ie: calculate the
      * distance between each successive point and sum them.
      */
-    public static double distance(List<LatLng> locations){
+    public static double distance(Collection<LatLng> locations){
         double result = 0;
-        for(int i = 0; i < locations.size() - 1; i++){
-            result += distance(locations.get(i), locations.get(i + 1));
+        Iterator<LatLng> iterator = locations.iterator();
+        while(iterator.hasNext()){
+            final LatLng p1 = iterator.next();
+            if(iterator.hasNext()){
+                final LatLng p2 = iterator.next();
+                result += distance(p1, p2);
+            }
         }
         return result;
     }
