@@ -7,6 +7,7 @@ import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.location.Address;
+import android.location.Location;
 import android.os.Bundle;
 import android.view.*;
 import android.widget.AdapterView;
@@ -15,6 +16,11 @@ import android.widget.SeekBar;
 import android.widget.Toast;
 import com.directions.route.Routing;
 import com.directions.route.RoutingListener;
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.GooglePlayServicesClient;
+import com.google.android.gms.location.LocationClient;
+import com.google.android.gms.location.LocationListener;
+import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.model.*;
@@ -26,26 +32,32 @@ import mobi.droid.fakeroad.ui.view.AutoCompleteAddressTextView;
 
 import java.util.*;
 
-public class MainActivity extends BaseMapViewActivity{
+public class MainActivity extends BaseMapViewActivity implements LocationListener, GooglePlayServicesClient.ConnectionCallbacks, GooglePlayServicesClient.OnConnectionFailedListener{
 
     public static final String APP_PREFERENCES = "map";
     public static final String PREF_DIRECTION_CALCULATE = "direction.calculate";
     public static final String PREF_DIRECTION_TRAVELMODE = "direction.travelmode";
+    MarkerOptions moveMarker = new MarkerOptions();
     private IconGenerator mIconGenerator;
-    private LinkedList<LatLng> mMarkers = new LinkedList<LatLng>();
+    private LinkedList<LatLng> mPoints = new LinkedList<LatLng>();
     ///
     private ProgressDialog mProgressDialog;
     private Routing.TravelMode mTravelMode = Routing.TravelMode.DRIVING;
     private boolean mDirectionCalculate = true;
-
     private int mSpeed;
-
     private Random mColorRandom = new Random(Color.BLUE);
     private int mTotalDistance;
+    private LocationClient mLocationClient;
+
+    private static String makeDistanceString(final int aDistance){
+        return aDistance < 1000 ?
+                String.valueOf(aDistance) + " m" :
+                String.valueOf(aDistance / 1000) + "." + String.valueOf((aDistance % 1000) / 10) + " km";
+    }
 
     private void cleanup(){
         mMap.clear();
-        mMarkers.clear();
+        mPoints.clear();
         mTotalDistance = 0;
         mColorRandom = new Random(Color.BLUE);
     }
@@ -69,17 +81,22 @@ public class MainActivity extends BaseMapViewActivity{
                 }
             });
         }
+        if(mLocationClient == null){
+            mLocationClient = new LocationClient(getApplicationContext(), this, this);
+        }
+
     }
 
     private String appendToFullDistance(final int aDistance){
         mTotalDistance += aDistance;
-        return "Total: " + makeDistanceString(mMarkers.isEmpty() ? 0 : mTotalDistance);
+        return "Total: " + makeDistanceString(mPoints.isEmpty() ? 0 : mTotalDistance);
     }
 
     private void restorePreferences(){
         SharedPreferences prefs = getSharedPreferences(APP_PREFERENCES, MODE_PRIVATE);
         mDirectionCalculate = prefs.getBoolean(PREF_DIRECTION_CALCULATE, true);
-        mTravelMode = Routing.TravelMode.valueOf(prefs.getString(PREF_DIRECTION_TRAVELMODE, Routing.TravelMode.DRIVING.name()));
+        mTravelMode = Routing.TravelMode.valueOf(
+                prefs.getString(PREF_DIRECTION_TRAVELMODE, Routing.TravelMode.DRIVING.name()));
     }
 
     @Override
@@ -91,14 +108,27 @@ public class MainActivity extends BaseMapViewActivity{
     }
 
     @Override
+    protected void onStart(){
+        super.onStart();
+        mLocationClient.connect();
+
+    }
+
+    @Override
+    protected void onStop(){
+        super.onStop();
+        mLocationClient.disconnect();
+    }
+
+    @Override
     protected void onAddMarker(final LatLng aLatLng){
         int color = Color.argb(255, mColorRandom.nextInt(256), mColorRandom.nextInt(256), mColorRandom.nextInt(256));
-        LatLng oldLast = mMarkers.peekLast();
+        LatLng oldLast = mPoints.peekLast();
         int distance = oldLast == null ? 0 : (int) MapsHelper.distance(oldLast, aLatLng) / 2;
         addPointToMap(aLatLng, color, distance);
 
-        if(!mMarkers.isEmpty()){
-            LatLng last = mMarkers.getLast();
+        if(!mPoints.isEmpty()){
+            LatLng last = mPoints.getLast();
             if(mDirectionCalculate){
                 calculateRoute(color, last, aLatLng);
             } else{
@@ -107,7 +137,7 @@ public class MainActivity extends BaseMapViewActivity{
                                                                          MapsHelper.bearing(oldLast, aLatLng)));
             }
         }
-        mMarkers.add(aLatLng);
+        mPoints.add(aLatLng);
     }
 
     private void addRouteLine(final int aColor, final LatLng... aLatLng){
@@ -133,12 +163,6 @@ public class MainActivity extends BaseMapViewActivity{
         mMap.addMarker(distanceMarker);
 
         setTitle(appendToFullDistance(aDistance));
-    }
-
-    private static String makeDistanceString(final int aDistance){
-        return aDistance < 1000 ?
-                String.valueOf(aDistance) + " m" :
-                String.valueOf(aDistance / 1000) + "." + String.valueOf((aDistance % 1000) / 10) + " km";
     }
 
     public void calculateRoute(final int aColor, final LatLng aFrom, final LatLng aTo){
@@ -179,8 +203,9 @@ public class MainActivity extends BaseMapViewActivity{
                             sortedPoints.add(latLng);
                         }
                     }
-
-                    mMarkers.addAll(sortedPoints);
+                    mPoints.removeLast();
+                    mPoints.removeLast();
+                    mPoints.addAll(sortedPoints);
 
                     addRouteLine(aColor, sortedPoints.toArray(new LatLng[sortedPoints.size()]));
 
@@ -196,7 +221,7 @@ public class MainActivity extends BaseMapViewActivity{
     private void addPointToMap(final LatLng aLatLng, final int aColor, final int aDistance){
         MarkerOptions pointMarker = new MarkerOptions();
         pointMarker.draggable(false);
-        if(mMarkers.isEmpty()){
+        if(mPoints.isEmpty()){
             pointMarker.icon(BitmapDescriptorFactory.fromResource(R.drawable.start_blue));
         } else{
             float[] hsv = new float[3];
@@ -357,7 +382,7 @@ public class MainActivity extends BaseMapViewActivity{
             @Override
             public void onClick(final DialogInterface dialog, final int which){
                 dialog.dismiss();
-                FakeLocationService.start(MainActivity.this, mSpeed, -1, mMarkers);
+                FakeLocationService.start(MainActivity.this, mSpeed, -1, mPoints);
             }
         });
         ab.setNegativeButton(android.R.string.cancel, new DialogInterface.OnClickListener(){
@@ -398,5 +423,30 @@ public class MainActivity extends BaseMapViewActivity{
         }
     }
 
+    @Override
+    public void onLocationChanged(final Location location){
+        if(location != null){
+            moveMarker.visible(true);
+            moveMarker.position(new LatLng(location.getLatitude(), location.getLongitude()));
+        }
+    }
+
+    @Override
+    public void onConnected(final Bundle aBundle){
+        LocationRequest locationRequest = LocationRequest.create().setSmallestDisplacement(50);
+        locationRequest.setInterval(1000);
+        mLocationClient.requestLocationUpdates(locationRequest, this);
+    }
+
+    @Override
+    public void onDisconnected(){
+        mLocationClient.removeLocationUpdates(this);
+    }
+
+    @Override
+    public void onConnectionFailed(final ConnectionResult aConnectionResult){
+        //todo
+        int i = 0;
+    }
 }
 
