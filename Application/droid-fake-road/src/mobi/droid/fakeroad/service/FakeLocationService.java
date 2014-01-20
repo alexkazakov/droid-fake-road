@@ -14,6 +14,7 @@ import android.os.IBinder;
 import android.os.SystemClock;
 import android.util.Log;
 import android.util.Pair;
+import android.widget.Toast;
 import com.google.android.gms.maps.model.LatLng;
 import mobi.droid.fakeroad.Actions;
 import mobi.droid.fakeroad.location.MapsHelper;
@@ -185,7 +186,9 @@ public class FakeLocationService extends Service{
             try{
                 lm.setTestProviderLocation(LocationManager.GPS_PROVIDER, location);
             } catch(Exception e){
-                e.printStackTrace(); // TODO AK handle errors
+                Toast.makeText(FakeLocationService.this, "Stopped movement: " + e.getMessage(),
+                               Toast.LENGTH_LONG).show();
+                e.printStackTrace();
                 stopMoving();
                 return;
             }
