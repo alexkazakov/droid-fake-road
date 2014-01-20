@@ -97,6 +97,49 @@ public class MapsHelper{
         Log.v(TAG, "Added [" + aPoints.size() + "] location: " + aPoint);
     }
 
+    /**
+     * Calculate next point.
+     *
+     * @param aLastPoint 'first' contains user selected point, 'second' contains calculated point at distance from previous lastpoint's 'first'.
+     * @param aSourcePoints user selected points.
+     * @param aDistance distance to travel from lastPoint.second position.
+     * @return 'first' contains nearest user selected point, 'second' contains calculated point at distance from previous lastpoint's 'first'.
+     */
+    public static Pair<LatLng, LatLng> nextLatLng(Pair<LatLng, LatLng> aLastPoint, final List<LatLng> aSourcePoints,
+                                                  final int aDistance){
+        int totalDistance = aDistance;
+        int startIndex = -1;
+        for(LatLng l : aSourcePoints){
+            startIndex++;
+            if(l.equals(aLastPoint.first)){
+                break;
+            }
+        }
+        boolean noNextPoint = aLastPoint.second.equals(aSourcePoints.get(aSourcePoints.size() - 1));
+        if(noNextPoint){
+            return aLastPoint;
+        }
+        for(int i = startIndex; i < aSourcePoints.size() - 1; i++){
+            LatLng p1;
+            if(i == startIndex){
+                p1 = aLastPoint.second;
+            } else{
+                p1 = aSourcePoints.get(i);
+            }
+            LatLng p2 = aSourcePoints.get(i + 1);
+
+            double distance = distance(p1, p2);
+            if(distance < totalDistance){
+                totalDistance -= distance; // skip to next points
+            } else{
+                LatLng point = calcLngLat(p1, totalDistance, MapsHelper.bearing(p1, p2));
+                return Pair.create(aSourcePoints.get(i), point);
+            }
+        }
+        LatLng sourcePoint = aSourcePoints.get(aSourcePoints.size() - 1);
+        return Pair.create(sourcePoint, sourcePoint);
+    }
+
     private static Pair<LatLng, LatLng> nextLatLng(final Pair<LatLng, LatLng> aLastPoint,
                                                    final LinkedList<LatLng> aResultPoints,
                                                    final List<LatLng> aSourcePoints,

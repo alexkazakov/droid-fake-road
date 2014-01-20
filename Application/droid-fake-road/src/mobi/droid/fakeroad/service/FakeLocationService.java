@@ -12,13 +12,14 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.SystemClock;
+import android.util.Log;
+import android.util.Pair;
 import com.google.android.gms.maps.model.LatLng;
 import mobi.droid.fakeroad.Actions;
 import mobi.droid.fakeroad.location.MapsHelper;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
-import java.util.LinkedList;
 import java.util.List;
 
 public class FakeLocationService extends Service{
@@ -85,17 +86,13 @@ public class FakeLocationService extends Service{
         int speed = aIntent.getIntExtra(EXTRA_SPEED, 0);
         long time = aIntent.getLongExtra(EXTRA_TIME, 0);
 
-        if(speed <= 0 && time <= 0){
+        if(speed < 1 && time < 1){
             mMoving = false;
             stopSelf();
             return;
         }
-
-        LinkedList<LatLng> pointsList;
-        if(speed <= -1){
-            pointsList = MapsHelper.getPathPointsForTime(time, sourcePoints);
-        } else{
-            pointsList = MapsHelper.getPathPointsForSpeed(speed, sourcePoints);
+        if(speed < 1){
+            speed = (int) (time / MapsHelper.distance(sourcePoints));
         }
 
         @SuppressWarnings("deprecation")
@@ -107,7 +104,7 @@ public class FakeLocationService extends Service{
                                         0);
         locationManager.setTestProviderEnabled(LocationManager.GPS_PROVIDER, true);
 
-        mGenerator = new LocationGenerator(pointsList, speed);
+        mGenerator = new LocationGenerator(sourcePoints, speed);
         mHandler.post(mGenerator);
     }
 
@@ -135,12 +132,14 @@ public class FakeLocationService extends Service{
     //
     private class LocationGenerator implements Runnable{
 
-        private LinkedList<LatLng> mList;
+        private List<LatLng> mSourcePoints;
         private int mSpeed;
+        private Pair<LatLng, LatLng> mLastPointPair;
 
-        private LocationGenerator(final LinkedList<LatLng> aList, final int aSpeed){
-            mList = aList;
+        private LocationGenerator(final ArrayList<LatLng> aList, final int aSpeed){
+            mSourcePoints = aList;
             mSpeed = aSpeed;
+            mLastPointPair = Pair.create(mSourcePoints.get(0), mSourcePoints.get(0));
         }
 
         @Override
@@ -148,47 +147,55 @@ public class FakeLocationService extends Service{
             if(!mMoving){
                 return;
             }
-            LatLng latLng = mList.poll();
-            if(latLng == null){
+
+            mLastPointPair = MapsHelper.nextLatLng(mLastPointPair, mSourcePoints, mSpeed);
+            LatLng currentPoint = mLastPointPair.second;
+
+            Pair<LatLng, LatLng> nextPair = MapsHelper.nextLatLng(mLastPointPair, mSourcePoints, mSpeed);
+            LatLng nextPoint = nextPair.second;
+
+            Log.v("mobi.droid.fakeroad.gen", "curr=" + currentPoint);
+            Log.v("mobi.droid.fakeroad.gen", "next=" + nextPoint);
+
+            Location location = new Location(LocationManager.GPS_PROVIDER);
+            location.setLatitude(currentPoint.latitude);
+            location.setLongitude(currentPoint.longitude);
+            location.setAccuracy(0.0f);
+
+            location.setSpeed(mSpeed);
+            if(!currentPoint.equals(nextPoint)){
+                location.setBearing(MapsHelper.bearing(currentPoint, nextPoint));
+            }
+
+            location.setTime(System.currentTimeMillis());
+            if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1){
+                location.setElapsedRealtimeNanos(SystemClock.elapsedRealtimeNanos());
+            }
+
+            try{ // trick to initialize all last fields with default values
+                Method locationJellyBeanFixMethod = Location.class.getMethod("makeComplete");
+                if(locationJellyBeanFixMethod != null){
+                    locationJellyBeanFixMethod.invoke(location);
+                }
+            } catch(Exception e){
+                e.printStackTrace();
+            }
+
+            LocationManager lm = (LocationManager) getSystemService(LOCATION_SERVICE);
+            try{
+                lm.setTestProviderLocation(LocationManager.GPS_PROVIDER, location);
+            } catch(Exception e){
+                e.printStackTrace(); // TODO AK handle errors
                 stopMoving();
                 return;
-            } else{
-                LocationManager lm = (LocationManager) getSystemService(LOCATION_SERVICE);
-
-                Location location = new Location(LocationManager.GPS_PROVIDER);
-                location.setLatitude(latLng.latitude);
-                location.setLongitude(latLng.longitude);
-                location.setAccuracy(0.0f);
-
-                location.setSpeed(mSpeed);
-                LatLng nextLocation = mList.peek();
-                if(nextLocation != null){
-                    location.setBearing(MapsHelper.bearing(latLng, nextLocation));
-                }
-
-                location.setTime(System.currentTimeMillis());
-                if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1){
-                    location.setElapsedRealtimeNanos(SystemClock.elapsedRealtimeNanos());
-                }
-
-                try{ // trick to initialize all last fields with default values
-                    Method locationJellyBeanFixMethod = Location.class.getMethod("makeComplete");
-                    if(locationJellyBeanFixMethod != null){
-                        locationJellyBeanFixMethod.invoke(location);
-                    }
-                } catch(Exception e){
-                    e.printStackTrace();
-                }
-
-                try{
-                    lm.setTestProviderLocation(LocationManager.GPS_PROVIDER, location);
-                } catch(Exception e){
-                    e.printStackTrace(); // TODO AK handle errors
-                    stopMoving();
-                    return;
-                }
             }
-            mHandler.postDelayed(this, LOCATION_UPDATE_INTERVAL);
+
+            if(currentPoint.equals(nextPoint)){
+                stopMoving();
+            } else{
+                mHandler.postDelayed(this, LOCATION_UPDATE_INTERVAL);
+            }
+
         }
     }
 }
