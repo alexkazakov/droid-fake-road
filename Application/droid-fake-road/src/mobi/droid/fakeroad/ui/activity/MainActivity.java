@@ -21,6 +21,7 @@ import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.model.*;
+import com.google.maps.android.SphericalUtil;
 import com.google.maps.android.ui.IconGenerator;
 import mobi.droid.fakeroad.R;
 import mobi.droid.fakeroad.location.MapsHelper;
@@ -35,7 +36,6 @@ public class MainActivity extends BaseMapViewActivity implements LocationListene
     public static final String PREF_DIRECTION_CALCULATE = "direction.calculate";
     public static final String PREF_DIRECTION_TRAVELMODE = "direction.travelmode";
     MarkerOptions moveMarker = new MarkerOptions();
-    private IconGenerator mIconGenerator;
     private LinkedList<LatLng> mPoints = new LinkedList<LatLng>();
     ///
     private ProgressDialog mProgressDialog;
@@ -45,7 +45,12 @@ public class MainActivity extends BaseMapViewActivity implements LocationListene
     private Random mColorRandom = new Random(Color.BLUE);
     private int mTotalDistance;
     private LocationClient mLocationClient;
-    private TextView mViewById;
+    private TextView mTvTotal;
+    private TextView mTvDrove;
+    private LatLng mLastPosition;
+    private int mDroveDistance;
+    private IconGenerator mIconGenerator;
+    private Marker mSpeedMarker;
 
     private static String makeDistanceString(final int aDistance){
         return aDistance < 1000 ?
@@ -57,6 +62,7 @@ public class MainActivity extends BaseMapViewActivity implements LocationListene
         mMap.clear();
         mPoints.clear();
         mTotalDistance = 0;
+        mDroveDistance = 0;
         mColorRandom = new Random(Color.BLUE);
     }
 
@@ -82,8 +88,16 @@ public class MainActivity extends BaseMapViewActivity implements LocationListene
             mLocationClient = new LocationClient(getApplicationContext(), this, this);
         }
 
-        mViewById = (TextView) findViewById(R.id.tvTotal);
-        mViewById.setText((appendToFullDistance(0)));
+        mTvTotal = (TextView) findViewById(R.id.tvTotal);
+
+        mTvDrove = (TextView) findViewById(R.id.tvDrove);
+        mTvTotal.setText((appendToFullDistance(0)));
+        mTvDrove.setText(appendToDroveDistance(0));
+    }
+
+    private String appendToDroveDistance(final int aDistance){
+        mDroveDistance += aDistance;
+        return "Drove: " + makeDistanceString(mDroveDistance);
     }
 
     private String appendToFullDistance(final int aDistance){
@@ -162,7 +176,7 @@ public class MainActivity extends BaseMapViewActivity implements LocationListene
         distanceMarker.icon(BitmapDescriptorFactory.fromBitmap(icon));
         mMap.addMarker(distanceMarker);
 
-        mViewById.setText(appendToFullDistance(aDistance));
+        mTvTotal.setText(appendToFullDistance(aDistance));
 
     }
 
@@ -278,7 +292,8 @@ public class MainActivity extends BaseMapViewActivity implements LocationListene
         switch(item.getItemId()){
             case R.id.action_new_route:
                 cleanup();
-                mViewById.setText((appendToFullDistance(0)));
+                mTvTotal.setText((appendToFullDistance(0)));
+                mTvDrove.setText(appendToDroveDistance(0));
                 return true;
             case R.id.action_start_route:
                 showSpeedDialog();
@@ -436,11 +451,47 @@ public class MainActivity extends BaseMapViewActivity implements LocationListene
         }
     }
 
+    private void addIcon(IconGenerator iconFactory, String text, LatLng position){
+        if(mSpeedMarker == null){
+        MarkerOptions markerOptions = new MarkerOptions().
+                icon(BitmapDescriptorFactory.fromBitmap(iconFactory.makeIcon(text))).
+                position(position).
+                anchor(iconFactory.getAnchorU(), iconFactory.getAnchorV());
+            mSpeedMarker = mMap.addMarker(markerOptions);
+        }else{
+            mSpeedMarker.setPosition(position);
+            mSpeedMarker.setIcon(BitmapDescriptorFactory.fromBitmap(iconFactory.makeIcon(text)));
+        }
+    }
+
     @Override
     public void onLocationChanged(final Location location){
         if(location != null){
-            moveMarker.visible(true);
-            moveMarker.position(new LatLng(location.getLatitude(), location.getLongitude()));
+            if(!moveMarker.isVisible()){
+                moveMarker.visible(true);
+            }
+
+
+
+            LatLng lastPosition = new LatLng(location.getLatitude(), location.getLongitude());
+            addIcon(mIconGenerator,
+                    String.valueOf(location.getSpeed() + " m/s" + "(" + (int)(location.getSpeed() * 3.6) + " km/h)"),
+                    lastPosition);
+            if(mLastPosition != null){
+                final double v = SphericalUtil.computeDistanceBetween(mLastPosition, lastPosition);
+                runOnUiThread(new Runnable(){
+
+                    @Override
+                    public void run(){
+                        mTvDrove.setText(appendToDroveDistance((int) v));
+
+                    }
+                });
+            }
+            mLastPosition = lastPosition;
+//            moveMarker.position(mLastPosition);
+            mMap.moveCamera(CameraUpdateFactory.newLatLng(mLastPosition));
+
         }
     }
 
