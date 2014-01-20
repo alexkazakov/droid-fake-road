@@ -10,10 +10,7 @@ import android.location.Address;
 import android.location.Location;
 import android.os.Bundle;
 import android.view.*;
-import android.widget.AdapterView;
-import android.widget.FrameLayout;
-import android.widget.SeekBar;
-import android.widget.Toast;
+import android.widget.*;
 import com.directions.route.Routing;
 import com.directions.route.RoutingListener;
 import com.google.android.gms.common.ConnectionResult;
@@ -48,6 +45,7 @@ public class MainActivity extends BaseMapViewActivity implements LocationListene
     private Random mColorRandom = new Random(Color.BLUE);
     private int mTotalDistance;
     private LocationClient mLocationClient;
+    private TextView mViewById;
 
     private static String makeDistanceString(final int aDistance){
         return aDistance < 1000 ?
@@ -70,7 +68,6 @@ public class MainActivity extends BaseMapViewActivity implements LocationListene
         restorePreferences();
 
         getActionBar().setDisplayOptions(0, ActionBar.DISPLAY_SHOW_HOME);
-        setTitle(appendToFullDistance(0));
 
         if(mMap != null){
             mMap.setOnMapLongClickListener(new GoogleMap.OnMapLongClickListener(){
@@ -85,6 +82,8 @@ public class MainActivity extends BaseMapViewActivity implements LocationListene
             mLocationClient = new LocationClient(getApplicationContext(), this, this);
         }
 
+        mViewById = (TextView) findViewById(R.id.tvTotal);
+        mViewById.setText((appendToFullDistance(0)));
     }
 
     private String appendToFullDistance(final int aDistance){
@@ -143,8 +142,9 @@ public class MainActivity extends BaseMapViewActivity implements LocationListene
     private void addRouteLine(final int aColor, final LatLng... aLatLng){
         PolylineOptions polylineOptions = new PolylineOptions();
         polylineOptions.add(aLatLng);
-        polylineOptions.width(4);
+        polylineOptions.width(8);
         polylineOptions.color(aColor);
+        polylineOptions.geodesic(true);
         mMap.addPolyline(polylineOptions);
     }
 
@@ -162,11 +162,12 @@ public class MainActivity extends BaseMapViewActivity implements LocationListene
         distanceMarker.icon(BitmapDescriptorFactory.fromBitmap(icon));
         mMap.addMarker(distanceMarker);
 
-        setTitle(appendToFullDistance(aDistance));
+        mViewById.setText(appendToFullDistance(aDistance));
+
     }
 
     public void calculateRoute(final int aColor, final LatLng aFrom, final LatLng aTo){
-        MapsHelper.calculateRoute(aFrom, aTo, new RoutingListener(){
+        MapsHelper.calculateRoute(mTravelMode, aFrom, aTo, new RoutingListener(){
 
             @Override
             public void onRoutingFailure(){
@@ -222,7 +223,7 @@ public class MainActivity extends BaseMapViewActivity implements LocationListene
         MarkerOptions pointMarker = new MarkerOptions();
         pointMarker.draggable(false);
         if(mPoints.isEmpty()){
-            pointMarker.icon(BitmapDescriptorFactory.fromResource(R.drawable.start_blue));
+            pointMarker.icon(BitmapDescriptorFactory.defaultMarker());
         } else{
             float[] hsv = new float[3];
             Color.colorToHSV(aColor, hsv);
@@ -277,7 +278,7 @@ public class MainActivity extends BaseMapViewActivity implements LocationListene
         switch(item.getItemId()){
             case R.id.action_new_route:
                 cleanup();
-                setTitle(appendToFullDistance(0));
+                mViewById.setText((appendToFullDistance(0)));
                 return true;
             case R.id.action_start_route:
                 showSpeedDialog();
@@ -288,28 +289,33 @@ public class MainActivity extends BaseMapViewActivity implements LocationListene
             case R.id.action_add_new_point:
                 promptPoint();
                 return true;
-            case R.id.action_autocalculate_direction:
-                mDirectionCalculate = !item.isChecked();
+            case R.id.direction_none:
+                mDirectionCalculate = false;
+                item.setChecked(!item.isChecked());
                 invalidateOptionsMenu();
                 return true;
             case R.id.direction_biking:
-                item.setChecked(!item.isChecked());
-                mTravelMode = Routing.TravelMode.BIKING;
-                invalidateOptionsMenu();
+                changeRoutingMode(item, Routing.TravelMode.BIKING);
                 return true;
             case R.id.direction_driving:
-                item.setChecked(!item.isChecked());
-                mTravelMode = Routing.TravelMode.DRIVING;
-                invalidateOptionsMenu();
+                changeRoutingMode(item, Routing.TravelMode.DRIVING);
                 return true;
             case R.id.direction_walking:
-                item.setChecked(!item.isChecked());
-                mTravelMode = Routing.TravelMode.WALKING;
-                invalidateOptionsMenu();
+                changeRoutingMode(item, Routing.TravelMode.WALKING);
+                return true;
+            case R.id.direction_transit:
+                changeRoutingMode(item, Routing.TravelMode.TRANSIT);
                 return true;
 
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    private void changeRoutingMode(final MenuItem item, final Routing.TravelMode aBiking){
+        mDirectionCalculate = true;
+        item.setChecked(!item.isChecked());
+        mTravelMode = aBiking;
+        invalidateOptionsMenu();
     }
 
     private void promptPoint(){
@@ -343,27 +349,34 @@ public class MainActivity extends BaseMapViewActivity implements LocationListene
     @SuppressWarnings("ConstantConditions")
     @Override
     public boolean onPrepareOptionsMenu(final Menu menu){
-        menu.findItem(R.id.action_autocalculate_direction).setChecked(mDirectionCalculate);
-        // direction travel types
-        menu.findItem(R.id.action_direction).getSubMenu().setGroupEnabled(R.id.action_group_direction_settings,
-                                                                          mDirectionCalculate);
-        switch(mTravelMode){
-            case WALKING:
-                menu.findItem(R.id.direction_walking).setChecked(true);
-                break;
-            case DRIVING:
-                menu.findItem(R.id.direction_driving).setChecked(true);
-                break;
-            case BIKING:
-                menu.findItem(R.id.direction_biking).setChecked(true);
-                break;
+        if(!mDirectionCalculate){
+            menu.findItem(R.id.direction_none).setChecked(true);
+
+        } else{
+            // direction travel types
+//        menu.findItem(R.id.action_direction).getSubMenu().setGroupEnabled(R.id.action_group_direction_settings,
+//                                                                          mDirectionCalculate);
+            switch(mTravelMode){
+                case WALKING:
+                    menu.findItem(R.id.direction_walking).setChecked(true);
+                    break;
+                case DRIVING:
+                    menu.findItem(R.id.direction_driving).setChecked(true);
+                    break;
+                case BIKING:
+                    menu.findItem(R.id.direction_biking).setChecked(true);
+                    break;
+                case TRANSIT:
+                    menu.findItem(R.id.direction_transit).setChecked(true);
+                    break;
+            }
         }
 
-        if(mDirectionCalculate){
-            menu.findItem(R.id.action_direction).setTitle("Pathfinding: " + mTravelMode.name());
-        } else{
-            menu.findItem(R.id.action_direction).setTitle("Pathfinding: OFF");
-        }
+//        if(mDirectionCalculate){
+//            menu.findItem(R.id.action_direction).setTitle("Pathfinding: " + mTravelMode.name());
+//        } else{
+//            menu.findItem(R.id.action_direction).setTitle("Pathfinding: OFF");
+//        }
         return true;
     }
 

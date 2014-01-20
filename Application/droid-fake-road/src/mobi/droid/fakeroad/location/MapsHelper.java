@@ -156,8 +156,9 @@ public class MapsHelper{
         return new LatLng(lat2 * DEGREES, lon2 * DEGREES);
     }
 
-    public static void calculateRoute(final LatLng aStart, final LatLng aEnd, final RoutingListener aRoutingListener){
-        Routing routing = new Routing(Routing.TravelMode.DRIVING);
+    public static void calculateRoute(final Routing.TravelMode aDriving, final LatLng aStart, final LatLng aEnd,
+                                      final RoutingListener aRoutingListener){
+        Routing routing = new Routing(aDriving);
         routing.registerListener(aRoutingListener);
         routing.execute(aStart, aEnd);
     }

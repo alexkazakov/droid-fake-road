@@ -1,26 +1,38 @@
 <?xml version="1.0" encoding="utf-8"?>
 
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:id="@+id/action_direction"
-          android:title="Direction"
-          android:showAsAction="always|withText">
+    <item
+            android:id="@+id/action_direction"
+            android:title="Direction"
+            android:showAsAction="always|withText">
         <menu>
-            <item android:id="@+id/action_autocalculate_direction"
-                  android:title="Enabled"
-                  android:checkable="true"
-                  android:showAsAction="always|withText"/>
-            <group android:id="@+id/action_group_direction_settings"
-                   android:checkableBehavior="single">
-                <item android:id="@+id/direction_walking"
-                      android:title="Walking"
-                      android:showAsAction="ifRoom|withText"/>
-                <item android:id="@+id/direction_biking"
-                      android:title="Biking"
-                      android:showAsAction="ifRoom|withText"/>
-                <item android:id="@+id/direction_driving"
-                      android:title="Driving"
-                      android:checked="true"
-                      android:showAsAction="ifRoom|withText"/>
+            <group
+                    android:id="@+id/action_group_direction_settings"
+                    android:checkableBehavior="single">
+                <item
+                        android:id="@+id/direction_none"
+                        android:title="None"
+                        android:showAsAction="ifRoom|withText"/>
+
+                <item
+                        android:id="@+id/direction_walking"
+                        android:title="Walking"
+                        android:showAsAction="ifRoom|withText"/>
+                <item
+                        android:id="@+id/direction_biking"
+                        android:title="Biking"
+                        android:showAsAction="ifRoom|withText"/>
+                <item
+                        android:id="@+id/direction_driving"
+                        android:title="Driving"
+                        android:checked="true"
+                        android:showAsAction="ifRoom|withText"/>
+                <item
+                        android:id="@+id/direction_transit"
+                        android:title="Transit"
+                        android:checked="true"
+                        android:showAsAction="ifRoom|withText"/>
+
             </group>
         </menu>
     </item>
