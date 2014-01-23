@@ -19,7 +19,12 @@
                 android:id="@+id/tvDrove"
                 android:layout_marginLeft="5dp"
                 />
-
+        <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:id="@+id/tvSpeed"
+                android:layout_marginLeft="5dp"
+                />
 
     </LinearLayout>
 

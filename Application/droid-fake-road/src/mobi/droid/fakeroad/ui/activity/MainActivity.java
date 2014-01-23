@@ -26,6 +26,7 @@ import com.google.maps.android.ui.IconGenerator;
 import mobi.droid.fakeroad.R;
 import mobi.droid.fakeroad.location.MapsHelper;
 import mobi.droid.fakeroad.service.FakeLocationService;
+import mobi.droid.fakeroad.service.LocationDbHelper;
 import mobi.droid.fakeroad.ui.view.AutoCompleteAddressTextView;
 
 import java.util.*;
@@ -36,6 +37,7 @@ public class MainActivity extends BaseMapViewActivity implements LocationListene
     public static final String PREF_DIRECTION_CALCULATE = "direction.calculate";
     public static final String PREF_DIRECTION_TRAVELMODE = "direction.travelmode";
     MarkerOptions moveMarker = new MarkerOptions();
+    int j = 0;
     private LinkedList<LatLng> mPoints = new LinkedList<LatLng>();
     ///
     private ProgressDialog mProgressDialog;
@@ -51,6 +53,7 @@ public class MainActivity extends BaseMapViewActivity implements LocationListene
     private int mDroveDistance;
     private IconGenerator mIconGenerator;
     private Marker mSpeedMarker;
+    private TextView mTvSpeed;
 
     private static String makeDistanceString(final int aDistance){
         return aDistance < 1000 ?
@@ -93,6 +96,8 @@ public class MainActivity extends BaseMapViewActivity implements LocationListene
         mTvDrove = (TextView) findViewById(R.id.tvDrove);
         mTvTotal.setText((appendToFullDistance(0)));
         mTvDrove.setText(appendToDroveDistance(0));
+
+        mTvSpeed = (TextView) findViewById(R.id.tvSpeed);
     }
 
     private String appendToDroveDistance(final int aDistance){
@@ -124,7 +129,6 @@ public class MainActivity extends BaseMapViewActivity implements LocationListene
     protected void onStart(){
         super.onStart();
         mLocationClient.connect();
-
     }
 
     @Override
@@ -404,13 +408,18 @@ public class MainActivity extends BaseMapViewActivity implements LocationListene
         seekBar.setProgress(mSpeed);
         seekBar.setLayoutParams(new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
                                                              ViewGroup.LayoutParams.WRAP_CONTENT));
-        ab.setTitle(String.format("Movement speed: %d m/s", mSpeed));
+        ab.setTitle(String.format("Movement speed: %d m/s (%d km/h)", mSpeed, (int) (mSpeed * 3.6)));
         ab.setPositiveButton("Go", new DialogInterface.OnClickListener(){
 
             @Override
             public void onClick(final DialogInterface dialog, final int which){
                 dialog.dismiss();
-                FakeLocationService.start(MainActivity.this, mSpeed, -1, mPoints);
+                LocationDbHelper locationDbHelper = new LocationDbHelper(MainActivity.this);
+                int routeID = locationDbHelper.queryNextRouteID();
+
+                locationDbHelper.writeLatLng(routeID, mPoints);
+
+                FakeLocationService.start(MainActivity.this, mSpeed, -1, routeID);
             }
         });
         ab.setNegativeButton(android.R.string.cancel, new DialogInterface.OnClickListener(){
@@ -427,7 +436,8 @@ public class MainActivity extends BaseMapViewActivity implements LocationListene
             @Override
             public void onProgressChanged(final SeekBar seekBar, final int progress, final boolean fromUser){
                 mSpeed = (1 + progress);
-                alertDialog.setTitle(String.format("Movement speed: %d m/s", mSpeed));
+                alertDialog.setTitle(String.format("Movement speed: %d m/s (%d km/h)", mSpeed, (int) (mSpeed * 3.6)));
+
             }
 
             @Override
@@ -453,12 +463,12 @@ public class MainActivity extends BaseMapViewActivity implements LocationListene
 
     private void addIcon(IconGenerator iconFactory, String text, LatLng position){
         if(mSpeedMarker == null){
-        MarkerOptions markerOptions = new MarkerOptions().
-                icon(BitmapDescriptorFactory.fromBitmap(iconFactory.makeIcon(text))).
-                position(position).
-                anchor(iconFactory.getAnchorU(), iconFactory.getAnchorV());
+            MarkerOptions markerOptions = new MarkerOptions().
+                    icon(BitmapDescriptorFactory.fromBitmap(iconFactory.makeIcon(text))).
+                    position(position).
+                    anchor(iconFactory.getAnchorU(), iconFactory.getAnchorV());
             mSpeedMarker = mMap.addMarker(markerOptions);
-        }else{
+        } else{
             mSpeedMarker.setPosition(position);
             mSpeedMarker.setIcon(BitmapDescriptorFactory.fromBitmap(iconFactory.makeIcon(text)));
         }
@@ -466,23 +476,22 @@ public class MainActivity extends BaseMapViewActivity implements LocationListene
 
     @Override
     public void onLocationChanged(final Location location){
-        if(location != null){
+        if(location != null && FakeLocationService.isFakeRunning(this)){
             if(!moveMarker.isVisible()){
                 moveMarker.visible(true);
             }
 
-
-
             LatLng lastPosition = new LatLng(location.getLatitude(), location.getLongitude());
-            addIcon(mIconGenerator,
-                    String.valueOf(location.getSpeed() + " m/s" + "(" + (int)(location.getSpeed() * 3.6) + " km/h)"),
-                    lastPosition);
+            final String speed = String.valueOf(
+                    location.getSpeed() + " m/s" + "(" + (int) (location.getSpeed() * 3.6) + " km/h)");
             if(mLastPosition != null){
                 final double v = SphericalUtil.computeDistanceBetween(mLastPosition, lastPosition);
+
                 runOnUiThread(new Runnable(){
 
                     @Override
                     public void run(){
+                        mTvSpeed.setText("lc: " + (++j));
                         mTvDrove.setText(appendToDroveDistance((int) v));
 
                     }
@@ -497,8 +506,8 @@ public class MainActivity extends BaseMapViewActivity implements LocationListene
 
     @Override
     public void onConnected(final Bundle aBundle){
-        LocationRequest locationRequest = LocationRequest.create().setSmallestDisplacement(50);
-        locationRequest.setInterval(1000);
+        LocationRequest locationRequest = LocationRequest.create().setPriority(
+                LocationRequest.PRIORITY_HIGH_ACCURACY).setInterval(3000).setFastestInterval(500);
         mLocationClient.requestLocationUpdates(locationRequest, this);
     }
 

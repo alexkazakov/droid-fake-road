@@ -4,10 +4,7 @@ import android.app.Activity;
 import android.os.Bundle;
 import android.widget.Toast;
 import com.google.android.gms.common.GooglePlayServicesNotAvailableException;
-import com.google.android.gms.maps.GoogleMap;
-import com.google.android.gms.maps.MapView;
-import com.google.android.gms.maps.MapsInitializer;
-import com.google.android.gms.maps.UiSettings;
+import com.google.android.gms.maps.*;
 import com.google.android.gms.maps.model.LatLng;
 import mobi.droid.fakeroad.R;
 import mobi.droid.fakeroad.location.MapsHelper;
@@ -43,7 +40,8 @@ public abstract class BaseMapViewActivity extends Activity{
             mMap = mMapView.getMap();
             mMap.setMyLocationEnabled(true);
             mMap.setTrafficEnabled(false);
-
+            mMap.animateCamera(
+                    CameraUpdateFactory.zoomBy(12f));
             UiSettings uiSettings = mMap.getUiSettings();
             uiSettings.setAllGesturesEnabled(true);
             uiSettings.setCompassEnabled(true);
