@@ -40,13 +40,15 @@ public abstract class BaseMapViewActivity extends Activity{
             mMap = mMapView.getMap();
             mMap.setMyLocationEnabled(true);
             mMap.setTrafficEnabled(false);
-            mMap.animateCamera(
-                    CameraUpdateFactory.zoomBy(12f));
+//            mMap.animateCamera(
+//                    CameraUpdateFactory.zoomBy(12f));
             UiSettings uiSettings = mMap.getUiSettings();
             uiSettings.setAllGesturesEnabled(true);
             uiSettings.setCompassEnabled(true);
             uiSettings.setZoomControlsEnabled(true);
             uiSettings.setMyLocationButtonEnabled(true);
+
+
         } catch(GooglePlayServicesNotAvailableException e){
             e.printStackTrace();
             finish();

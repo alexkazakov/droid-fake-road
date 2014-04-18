@@ -1,9 +1,6 @@
 package mobi.droid.fakeroad.service;
 
-import android.app.ActivityManager;
-import android.app.Notification;
-import android.app.PendingIntent;
-import android.app.Service;
+import android.app.*;
 import android.content.Context;
 import android.content.Intent;
 import android.location.Location;
@@ -22,6 +19,7 @@ import mobi.droid.fakeroad.location.MapsHelper;
 
 import java.lang.reflect.Method;
 import java.util.List;
+import java.util.Random;
 
 public class FakeLocationService extends Service{
 
@@ -29,19 +27,24 @@ public class FakeLocationService extends Service{
     public static final String EXTRA_ROUTE_ID = "points";
     public static final String EXTRA_SPEED = "speed";
     public static final String EXTRA_TIME = "time";
+    public static final String EXTRA_RANDOM_SPEED = "random.speed";
     //
     public static final int LOCATION_UPDATE_INTERVAL = 1000;
     //
     private Handler mHandler = new Handler();
     private boolean mMoving;
     private LocationGenerator mGenerator;
+    private int mSpeed = 0;
+    private int mRouteID = -1;
+    private boolean mRandomSpeed;
 
-    public static void start(Context aContext, int aSpeed, long aTime, int aRoute){
+    public static void start(Context aContext, int aSpeed, long aTime, int aRoute, final boolean aRandomSpeed){
         Intent intent = new Intent(Actions.ACTION_START_MOVING);
         intent.setClass(aContext, FakeLocationService.class);
         intent.putExtra(EXTRA_ROUTE_ID, aRoute);
         intent.putExtra(EXTRA_SPEED, aSpeed);
         intent.putExtra(EXTRA_TIME, aTime);
+        intent.putExtra(EXTRA_RANDOM_SPEED, aRandomSpeed);
         aContext.startService(intent);
     }
 
@@ -53,13 +56,12 @@ public class FakeLocationService extends Service{
 
     public static boolean isFakeRunning(Context aContext){
         ActivityManager manager = (ActivityManager) aContext.getSystemService(Context.ACTIVITY_SERVICE);
-        for (ActivityManager.RunningServiceInfo service : manager.getRunningServices(Integer.MAX_VALUE)) {
-            if (FakeLocationService.class.getName().equals(service.service.getClassName())) {
+        for(ActivityManager.RunningServiceInfo service : manager.getRunningServices(Integer.MAX_VALUE)){
+            if(FakeLocationService.class.getName().equals(service.service.getClassName())){
                 return true;
             }
         }
         return false;
-
 
     }
 
@@ -89,28 +91,30 @@ public class FakeLocationService extends Service{
 
         mHandler.removeCallbacks(mGenerator);
         mMoving = false;
-        stopForeground(true);
-        stopSelf();
+//        stopForeground(true);
+//        stopSelf();
     }
 
     private void startMoving(final Intent aIntent){
         mMoving = true;
 
-        int routeID = aIntent.getIntExtra(EXTRA_ROUTE_ID, -1);
-
-
+        mRouteID = aIntent.getIntExtra(EXTRA_ROUTE_ID, mRouteID);
+        mRandomSpeed = aIntent.getBooleanExtra(EXTRA_RANDOM_SPEED, mRandomSpeed);
 
 //        ArrayList<LatLng> sourcePoints =
-        int speed = aIntent.getIntExtra(EXTRA_SPEED, 0);
+        mSpeed = aIntent.getIntExtra(EXTRA_SPEED, mSpeed);
         long time = aIntent.getLongExtra(EXTRA_TIME, 0);
 
-        if(speed < 1 && time < 1){
+        if(mSpeed < 1 && time < 1){
             mMoving = false;
             stopSelf();
             return;
         }
-        if(speed < 1){
+        if(mSpeed < 1){
 //            speed = (int) (time / MapsHelper.distance(sourcePoints)); //todo
+        }
+        if(mRouteID == -1){
+            return;
         }
 
         Notification build = buildNotification();
@@ -123,7 +127,7 @@ public class FakeLocationService extends Service{
                                         0);
         locationManager.setTestProviderEnabled(LocationManager.GPS_PROVIDER, true);
 
-        mGenerator = new LocationGenerator(routeID, speed);
+        mGenerator = new LocationGenerator(mRouteID, mSpeed, mRandomSpeed);
         mHandler.post(mGenerator);
     }
 
@@ -132,11 +136,13 @@ public class FakeLocationService extends Service{
         b.setAutoCancel(true);
         b.setOngoing(true);
         b.setContentTitle("Fake movement is running");
+
         b.setSmallIcon(R.drawable.ic_launcher);
 //        b.setDefaults(Notification.DEFAULT_ALL);
         b.setPriority(Notification.PRIORITY_HIGH);
         //noinspection ConstantConditions
 //        b.setLargeIcon(BitmapFactory.decodeResource(getResources(), getApplicationInfo().icon));
+
         PendingIntent pi = PendingIntent.getService(this, 0, new Intent(Actions.ACTION_STOP_MOVING),
                                                     PendingIntent.FLAG_UPDATE_CURRENT);
 //        b.setDeleteIntent(pi);
@@ -145,6 +151,11 @@ public class FakeLocationService extends Service{
         b.addAction(android.R.drawable.ic_media_pause, "Stop", pi);
 //        b.setContentIntent(pi);
 //        b.setContentText("Click to stop fake movement");
+//        b.setWhen(System.currentTimeMillis());
+
+        pi = PendingIntent.getService(this, 1, new Intent(Actions.ACTION_START_MOVING),
+                                      PendingIntent.FLAG_UPDATE_CURRENT);
+        b.addAction(android.R.drawable.ic_media_play, "Start", pi);
         b.setWhen(System.currentTimeMillis());
 
         //noinspection deprecation
@@ -160,12 +171,14 @@ public class FakeLocationService extends Service{
 
         private List<LatLng> mSourcePoints;
         private int mRouteID;
-        private int mSpeed;
+        private int mSpeedLocation;
+        private boolean mRandomSpeed;
         private Pair<LatLng, LatLng> mLastPointPair;
 
-        private LocationGenerator(final int aRouteID, final int aSpeed){
+        private LocationGenerator(final int aRouteID, final int aSpeed, final boolean aRandomSpeed){
             mRouteID = aRouteID;
-            mSpeed = aSpeed;
+            mSpeedLocation = aSpeed;
+            mRandomSpeed = aRandomSpeed;
             LocationDbHelper ldh = new LocationDbHelper(FakeLocationService.this);
             mSourcePoints = ldh.queryPoints(aRouteID);
 
@@ -177,11 +190,19 @@ public class FakeLocationService extends Service{
             if(!mMoving){
                 return;
             }
+            int currentSpeed;
 
-            mLastPointPair = MapsHelper.nextLatLng(mLastPointPair, mSourcePoints, mSpeed);
+            if(mRandomSpeed){
+                Random random = new Random();
+                currentSpeed = random.nextInt(mSpeedLocation);
+            } else{
+                currentSpeed = mSpeedLocation;
+            }
+
+            mLastPointPair = MapsHelper.nextLatLng(mLastPointPair, mSourcePoints, currentSpeed);
             LatLng currentPoint = mLastPointPair.second;
 
-            Pair<LatLng, LatLng> nextPair = MapsHelper.nextLatLng(mLastPointPair, mSourcePoints, mSpeed);
+            Pair<LatLng, LatLng> nextPair = MapsHelper.nextLatLng(mLastPointPair, mSourcePoints, currentSpeed);
             LatLng nextPoint = nextPair.second;
 
             Log.v("mobi.droid.fakeroad.gen", "curr=" + currentPoint);
@@ -192,7 +213,7 @@ public class FakeLocationService extends Service{
             location.setLongitude(currentPoint.longitude);
             location.setAccuracy(0.0f);
 
-            location.setSpeed(mSpeed);
+            location.setSpeed(currentSpeed);
             if(!currentPoint.equals(nextPoint)){
                 location.setBearing(MapsHelper.bearing(currentPoint, nextPoint));
             }
@@ -210,6 +231,18 @@ public class FakeLocationService extends Service{
             } catch(Exception e){
                 e.printStackTrace();
             }
+            Notification.Builder b = new Notification.Builder(FakeLocationService.this);
+            b.setContentTitle("Current speed: ");
+
+            String format = String.format("Movement speed: %d m/s (%d km/h %d mph)", currentSpeed,
+                                          (int) (currentSpeed * 3.6),
+                                          (int) (currentSpeed * 2.23));
+            b.setContentText(format);
+            b.setSmallIcon(R.drawable.ic_launcher);
+            NotificationManager mNotifyManager =
+                    (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+
+            mNotifyManager.notify(555, b.build());
 
             LocationManager lm = (LocationManager) getSystemService(LOCATION_SERVICE);
             try{

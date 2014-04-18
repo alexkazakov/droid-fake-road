@@ -402,13 +402,25 @@ public class MainActivity extends BaseMapViewActivity implements LocationListene
     private void showSpeedDialog(){
         mSpeed = 10;
         AlertDialog.Builder ab = new AlertDialog.Builder(this);
+
+        LinearLayout l = new LinearLayout(this);
+        l.setOrientation(LinearLayout.VERTICAL);
         final SeekBar seekBar = new SeekBar(this);
-        ab.setView(seekBar);
+
         seekBar.setMax(99);
         seekBar.setProgress(mSpeed);
         seekBar.setLayoutParams(new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
                                                              ViewGroup.LayoutParams.WRAP_CONTENT));
-        ab.setTitle(String.format("Movement speed: %d m/s (%d km/h)", mSpeed, (int) (mSpeed * 3.6)));
+        String format = String.format("Movement speed: %d m/s (%d km/h %d mph)", mSpeed, (int) (mSpeed * 3.6),
+                                      (int) (mSpeed * 2.23));
+        ab.setTitle(format);
+
+        l.addView(seekBar);
+        final CheckBox ch = new CheckBox(this);
+        ch.setText("Random speed");
+        l.addView(ch);
+        ab.setView(l);
+
         ab.setPositiveButton("Go", new DialogInterface.OnClickListener(){
 
             @Override
@@ -419,7 +431,7 @@ public class MainActivity extends BaseMapViewActivity implements LocationListene
 
                 locationDbHelper.writeLatLng(routeID, mPoints);
 
-                FakeLocationService.start(MainActivity.this, mSpeed, -1, routeID);
+                FakeLocationService.start(MainActivity.this, mSpeed, -1, routeID,ch.isChecked());
             }
         });
         ab.setNegativeButton(android.R.string.cancel, new DialogInterface.OnClickListener(){
