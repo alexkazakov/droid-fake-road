@@ -448,7 +448,10 @@ public class MainActivity extends BaseMapViewActivity implements LocationListene
             @Override
             public void onProgressChanged(final SeekBar seekBar, final int progress, final boolean fromUser){
                 mSpeed = (1 + progress);
-                alertDialog.setTitle(String.format("Movement speed: %d m/s (%d km/h)", mSpeed, (int) (mSpeed * 3.6)));
+                String format = String.format("Movement speed: %d m/s (%d km/h %d mph)", mSpeed, (int) (mSpeed * 3.6),
+                                              (int) (mSpeed * 2.23));
+
+                alertDialog.setTitle(format);
 
             }
 

@@ -72,6 +72,9 @@ public class FakeLocationService extends Service{
 
     @Override
     public int onStartCommand(final Intent intent, final int flags, final int startId){
+        if(intent != null){
+
+        }
         if(Actions.ACTION_START_MOVING.equals(intent.getAction())){
             if(!mMoving){
                 startMoving(intent);
@@ -194,7 +197,7 @@ public class FakeLocationService extends Service{
 
             if(mRandomSpeed){
                 Random random = new Random();
-                currentSpeed = random.nextInt(mSpeedLocation);
+                currentSpeed = random.nextInt(mSpeedLocation) + 1;
             } else{
                 currentSpeed = mSpeedLocation;
             }
