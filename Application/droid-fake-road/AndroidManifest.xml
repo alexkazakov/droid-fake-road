@@ -29,8 +29,8 @@
 
         <activity
                 android:name=".ui.activity.MainActivity"
-                android:label="@string/app_name"
-                android:theme="@android:style/Theme.Holo">
+                android:theme="@android:style/Theme.Holo"
+                >
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
@@ -47,7 +47,7 @@
 
         <service
                 android:name=".service.FakeLocationService"
-             >
+                >
             <intent-filter>
                 <action android:name="stop.moving"/>
                 <action android:name="start.moving"/>

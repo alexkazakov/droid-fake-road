@@ -1,7 +1,7 @@
 package mobi.droid.fakeroad;
 
 /**
- * Created by ak on 10.01.14.
+ * @author ak
  */
 public interface Actions{
 

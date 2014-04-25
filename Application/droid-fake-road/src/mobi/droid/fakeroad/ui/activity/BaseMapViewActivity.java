@@ -4,13 +4,16 @@ import android.app.Activity;
 import android.os.Bundle;
 import android.widget.Toast;
 import com.google.android.gms.common.GooglePlayServicesNotAvailableException;
-import com.google.android.gms.maps.*;
+import com.google.android.gms.maps.GoogleMap;
+import com.google.android.gms.maps.MapView;
+import com.google.android.gms.maps.MapsInitializer;
+import com.google.android.gms.maps.UiSettings;
 import com.google.android.gms.maps.model.LatLng;
 import mobi.droid.fakeroad.R;
 import mobi.droid.fakeroad.location.MapsHelper;
 
 /**
- * Created by ak on 13.01.14.
+ * @author ak
  */
 public abstract class BaseMapViewActivity extends Activity{
 
@@ -47,7 +50,6 @@ public abstract class BaseMapViewActivity extends Activity{
             uiSettings.setCompassEnabled(true);
             uiSettings.setZoomControlsEnabled(true);
             uiSettings.setMyLocationButtonEnabled(true);
-
 
         } catch(GooglePlayServicesNotAvailableException e){
             e.printStackTrace();
