@@ -36,6 +36,7 @@ public abstract class BaseMapViewActivity extends Activity{
         mMapView.onResume();//needed to get the map to display immediately
 
         try{
+//todo Проверка на актуальность Google Play
             MapsInitializer.initialize(this);
             mMap = mMapView.getMap();
             mMap.setMyLocationEnabled(true);
