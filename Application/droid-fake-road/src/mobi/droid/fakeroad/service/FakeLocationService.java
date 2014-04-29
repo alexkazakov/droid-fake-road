@@ -3,6 +3,7 @@ package mobi.droid.fakeroad.service;
 import android.app.*;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.drawable.Drawable;
 import android.location.Location;
 import android.location.LocationManager;
 import android.os.Build;
@@ -26,10 +27,11 @@ public class FakeLocationService extends Service{
 
     public static final String EXTRA_ROUTE_ID = "points";
     public static final String EXTRA_SPEED = "speed";
+    public static final String EXTRA_MIN_SPEED = "min.speed";
     public static final String EXTRA_TIME = "time";
     public static final String EXTRA_RANDOM_SPEED = "random.speed";
     //
-    public static final int LOCATION_UPDATE_INTERVAL = 1000;
+    public static int LOCATION_UPDATE_INTERVAL = 1000;
     //
     private Handler mHandler = new Handler();
     private boolean mMoving;
@@ -37,14 +39,19 @@ public class FakeLocationService extends Service{
     private int mSpeed = 0;
     private int mRouteID = -1;
     private boolean mRandomSpeed;
+    private int mMinSpeed = 0;
 
-    public static void start(Context aContext, int aSpeed, long aTime, int aRoute, final boolean aRandomSpeed){
+    public static void start(Context aContext, int aSpeed, final int aMinSpeed, long aTime, int aRoute,
+                             final boolean aRandomSpeed,
+                             final int aUpdateLocationInterval){
         Intent intent = new Intent(Actions.ACTION_START_MOVING);
         intent.setClass(aContext, FakeLocationService.class);
         intent.putExtra(EXTRA_ROUTE_ID, aRoute);
         intent.putExtra(EXTRA_SPEED, aSpeed);
         intent.putExtra(EXTRA_TIME, aTime);
+        intent.putExtra(EXTRA_MIN_SPEED, aMinSpeed);
         intent.putExtra(EXTRA_RANDOM_SPEED, aRandomSpeed);
+//        LOCATION_UPDATE_INTERVAL = aUpdateLocationInterval <= 0 ? 1000 : aUpdateLocationInterval * 1000;//it's wrong
         aContext.startService(intent);
     }
 
@@ -107,6 +114,7 @@ public class FakeLocationService extends Service{
         mRandomSpeed = aIntent.getBooleanExtra(EXTRA_RANDOM_SPEED, mRandomSpeed);
 
         mSpeed = aIntent.getIntExtra(EXTRA_SPEED, mSpeed);
+        mMinSpeed = aIntent.getIntExtra(EXTRA_MIN_SPEED, mSpeed);
         long time = aIntent.getLongExtra(EXTRA_TIME, 0);
 
         if(mSpeed < 1 && time < 1){
@@ -141,6 +149,7 @@ public class FakeLocationService extends Service{
         } else{
             builder.setContentTitle(aText);
         }
+
         builder.setSmallIcon(R.drawable.ic_launcher);
         builder.setPriority(Notification.PRIORITY_HIGH);
 
@@ -164,6 +173,8 @@ public class FakeLocationService extends Service{
         return builder.getNotification();
     }
 
+
+
     //
     private class LocationGenerator implements Runnable{
 
@@ -172,6 +183,7 @@ public class FakeLocationService extends Service{
         private int mSpeedLocation;
         private boolean mRandomSpeed;
         private Pair<LatLng, LatLng> mLastPointPair;
+        Random random = new Random();
 
         private LocationGenerator(final int aRouteID, final int aSpeed, final boolean aRandomSpeed){
             mRouteID = aRouteID;
@@ -191,8 +203,7 @@ public class FakeLocationService extends Service{
             int currentSpeed;
 
             if(mRandomSpeed){
-                Random random = new Random();
-                currentSpeed = random.nextInt(mSpeedLocation) + 1;
+                currentSpeed = (mMinSpeed + (random.nextInt(mSpeedLocation - mMinSpeed) + 1));
             } else{
                 currentSpeed = mSpeedLocation;
             }
@@ -203,8 +214,8 @@ public class FakeLocationService extends Service{
             Pair<LatLng, LatLng> nextPair = MapsHelper.nextLatLng(mLastPointPair, mSourcePoints, currentSpeed);
             LatLng nextPoint = nextPair.second;
 
-            Log.v("mobi.droid.fakeroad.gen", "curr=" + currentPoint);
-            Log.v("mobi.droid.fakeroad.gen", "next=" + nextPoint);
+            Log.v("mobi.droid.fakeroad.gen", "curr=" + currentPoint + " next=" + nextPoint + " speed: " + currentSpeed);
+
 
             Location location = new Location(LocationManager.GPS_PROVIDER);
             location.setLatitude(currentPoint.latitude);

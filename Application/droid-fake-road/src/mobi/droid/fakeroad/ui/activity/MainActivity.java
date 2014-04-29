@@ -54,6 +54,7 @@ public class MainActivity extends BaseMapViewActivity implements LocationListene
     private IconGenerator mIconGenerator;
     private Marker mSpeedMarker;
     private TextView mTvSpeed;
+    private int mMinSpeed;
 
     private static String makeDistanceString(final int aDistance){
         return aDistance < 1000 ?
@@ -403,24 +404,37 @@ public class MainActivity extends BaseMapViewActivity implements LocationListene
     private void showSpeedDialog(){
         mSpeed = 10;
         AlertDialog.Builder ab = new AlertDialog.Builder(this);
-
+        ab.setTitle("Set speed");
         LinearLayout l = new LinearLayout(this);
         l.setOrientation(LinearLayout.VERTICAL);
-        final SeekBar seekBar = new SeekBar(this);
 
-        seekBar.setMax(99);
-        seekBar.setProgress(mSpeed);
-        seekBar.setLayoutParams(new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
-                                                             ViewGroup.LayoutParams.WRAP_CONTENT));
-        String format = String.format("Movement speed: %d m/s (%d km/h %d mph)", mSpeed, (int) (mSpeed * 3.6),
-                                      (int) (mSpeed * 2.23));
-        ab.setTitle(format);
+        LinearLayout l2 = new LinearLayout(this);
+        l.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        l2.setOrientation(LinearLayout.HORIZONTAL);
+        final NumberPicker numberPicker = new NumberPicker(this);
+        numberPicker.setMaxValue(100);
+        numberPicker.setMinValue(0);
+        numberPicker.setValue(mSpeed);
+        l2.addView(numberPicker);
 
-        l.addView(seekBar);
+
+
+        final NumberPicker seekBarMin = new NumberPicker(this);
+        seekBarMin.setMaxValue(99);
+        seekBarMin.setMinValue(0);
+        l2.addView(seekBarMin);
+
         final CheckBox ch = new CheckBox(this);
         ch.setText("Random speed");
+
+        l.addView(l2);
         l.addView(ch);
+
+
         ab.setView(l);
+
+
+
 
         ab.setPositiveButton("Go", new DialogInterface.OnClickListener(){
 
@@ -432,7 +446,8 @@ public class MainActivity extends BaseMapViewActivity implements LocationListene
 
                 locationDbHelper.writeLatLng(routeID, mPoints);
 
-                FakeLocationService.start(MainActivity.this, mSpeed, -1, routeID, ch.isChecked());
+                FakeLocationService.start(MainActivity.this, mSpeed, seekBarMin.getValue(), -1, routeID,
+                                          ch.isChecked(), 1000);
             }
         });
         ab.setNegativeButton(android.R.string.cancel, new DialogInterface.OnClickListener(){
@@ -442,28 +457,33 @@ public class MainActivity extends BaseMapViewActivity implements LocationListene
                 dialog.dismiss();
             }
         });
-
         final AlertDialog alertDialog = ab.show();
-        seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
+
+        numberPicker.setOnValueChangedListener(new NumberPicker.OnValueChangeListener(){
 
             @Override
-            public void onProgressChanged(final SeekBar seekBar, final int progress, final boolean fromUser){
-                mSpeed = (1 + progress);
-                String format = String.format("Movement speed: %d m/s (%d km/h %d mph)", mSpeed, (int) (mSpeed * 3.6),
-                                              (int) (mSpeed * 2.23));
-
-                alertDialog.setTitle(format);
-
-            }
-
-            @Override
-            public void onStartTrackingTouch(final SeekBar seekBar){
-            }
-
-            @Override
-            public void onStopTrackingTouch(final SeekBar seekBar){
+            public void onValueChange(final NumberPicker picker, final int oldVal, final int newVal){
+                mSpeed = newVal;
+                setSpeedTitle(alertDialog);
             }
         });
+        seekBarMin.setOnValueChangedListener(new NumberPicker.OnValueChangeListener(){
+
+
+            @Override
+            public void onValueChange(final NumberPicker picker, final int oldVal, final int newVal){
+                mMinSpeed = (newVal);
+                setSpeedTitle(alertDialog);
+            }
+        });
+    }
+
+    private void setSpeedTitle(final AlertDialog aAlertDialog){
+        String format = String.format("Max: %d m/s %d km/h %d mph", mSpeed, (int) (mSpeed * 3.6),
+                                      (int) (mSpeed * 2.23));
+        String formatMin = String.format("Min: %d m/s %d km/h %d mph", mMinSpeed, (int) (mMinSpeed * 3.6),
+                                         (int) (mMinSpeed * 2.23));
+        aAlertDialog.setTitle(format + "\n" + formatMin);
     }
 
     protected void pushFragment(Class<? extends Fragment> cls, Bundle args, final int rootID){
