@@ -77,6 +77,7 @@ public class MainActivity extends BaseMapViewActivity implements LocationListene
         restorePreferences();
 
         getActionBar().setDisplayOptions(0, ActionBar.DISPLAY_SHOW_HOME);
+        getActionBar().setDisplayShowTitleEnabled(false);
 
         if(mMap != null){
             mMap.setOnMapLongClickListener(new GoogleMap.OnMapLongClickListener(){
@@ -92,8 +93,8 @@ public class MainActivity extends BaseMapViewActivity implements LocationListene
         }
 
         mTvTotal = (TextView) findViewById(R.id.tvTotal);
-
         mTvDrove = (TextView) findViewById(R.id.tvDrove);
+
         mTvTotal.setText((appendToFullDistance(0)));
         mTvDrove.setText(appendToDroveDistance(0));
 
@@ -431,7 +432,7 @@ public class MainActivity extends BaseMapViewActivity implements LocationListene
 
                 locationDbHelper.writeLatLng(routeID, mPoints);
 
-                FakeLocationService.start(MainActivity.this, mSpeed, -1, routeID,ch.isChecked());
+                FakeLocationService.start(MainActivity.this, mSpeed, -1, routeID, ch.isChecked());
             }
         });
         ab.setNegativeButton(android.R.string.cancel, new DialogInterface.OnClickListener(){
