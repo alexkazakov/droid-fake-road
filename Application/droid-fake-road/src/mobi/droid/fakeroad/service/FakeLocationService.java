@@ -3,7 +3,6 @@ package mobi.droid.fakeroad.service;
 import android.app.*;
 import android.content.Context;
 import android.content.Intent;
-import android.graphics.drawable.Drawable;
 import android.location.Location;
 import android.location.LocationManager;
 import android.os.Build;
