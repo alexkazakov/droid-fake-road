@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.database.Cursor;
 import android.location.Location;
 import android.provider.Settings;
 import android.util.Log;
@@ -11,10 +12,10 @@ import android.util.Pair;
 import com.directions.route.Routing;
 import com.directions.route.RoutingListener;
 import com.google.android.gms.maps.model.LatLng;
+import mobi.droid.fakeroad.service.LocationDbHelper;
 
 import java.util.Collection;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 
 public class MapsHelper{
@@ -34,7 +35,7 @@ public class MapsHelper{
     /**
      * Calculate the distance between two points.
      */
-    public static double distance(LatLng p1, LatLng p2){
+    public static float distance(LatLng p1, LatLng p2){
         float[] result = new float[1];
         Location.distanceBetween(p1.latitude, p1.longitude,
                                  p2.latitude, p2.longitude, result);
@@ -59,42 +60,6 @@ public class MapsHelper{
             }
         }
         return result;
-    }
-
-    public static LinkedList<LatLng> getPathPointsForTime(long aTime, final List<LatLng> aPoints){
-        double fullPathMeters = distance(aPoints);
-        int speed = (int) (fullPathMeters / aTime);
-        return getPathPointsForSpeed(speed, aPoints);
-    }
-
-    public static LinkedList<LatLng> getPathPointsForSpeed(final int aSpeedMetersPerSecond, final List<LatLng> aPoints){
-        double fullPathMeters = distance(aPoints);
-        if(aSpeedMetersPerSecond < 1){
-            throw new IllegalArgumentException("Speed must be > 1 m/s");
-        }
-
-        int pointCount = (int) (fullPathMeters / aSpeedMetersPerSecond) + 1;
-        if(pointCount < 2){
-            pointCount = 2;
-        }
-
-        LinkedList<LatLng> points = new LinkedList<LatLng>();
-
-        addPoint(points, aPoints.get(0));
-        if(pointCount == 2){
-            addPoint(points, aPoints.get(aPoints.size() - 1));
-        } else{
-            Pair<LatLng, LatLng> lastPoint = Pair.create(aPoints.get(0), aPoints.get(0));
-            while(lastPoint.first != aPoints.get(aPoints.size() - 1)){
-                lastPoint = nextLatLng(lastPoint, points, aPoints, aSpeedMetersPerSecond);
-            }
-        }
-        return points;
-    }
-
-    private static void addPoint(final LinkedList<LatLng> aPoints, final LatLng aPoint){
-        aPoints.addLast(aPoint);
-        Log.v(TAG, "Added [" + aPoints.size() + "] location: " + aPoint);
     }
 
     /**
@@ -140,42 +105,47 @@ public class MapsHelper{
         return Pair.create(sourcePoint, sourcePoint);
     }
 
-    private static Pair<LatLng, LatLng> nextLatLng(final Pair<LatLng, LatLng> aLastPoint,
-                                                   final LinkedList<LatLng> aResultPoints,
-                                                   final List<LatLng> aSourcePoints,
-                                                   final int aDistance){
-        int totalDistance = aDistance;
-        int startIndex = -1;
-        for(LatLng l : aSourcePoints){
-            startIndex++;
-            if(l.equals(aLastPoint.first)){
-                break;
-            }
-        }
-        for(int i = startIndex; i < aSourcePoints.size() - 1; i++){
-            LatLng p1;
-            if(i == startIndex){
-                p1 = aLastPoint.second;
-            } else{
-                p1 = aSourcePoints.get(i);
-            }
-            LatLng p2 = aSourcePoints.get(i + 1);
+    public static Pair<LatLng, LatLng> nextLatLng(Pair<LatLng, LatLng> aLastPoint,
+                                                  final Cursor aPoints,
+                                                  LatLng aFinalPoint,
+                                                  LocationDbHelper aHelper,
+                                                  final int aDistance){
 
-            double distance = distance(p1, p2);
-            if(distance < totalDistance){
-                totalDistance -= distance; // skip to next points
-            } else{
-                LatLng point = calcLngLat(p1, totalDistance, MapsHelper.bearing(p1, p2));
-                addPoint(aResultPoints, point);
-                return Pair.create(aSourcePoints.get(i), point);
-            }
+        if(aFinalPoint.equals(aLastPoint.second)){
+            return aLastPoint;
         }
-        LatLng sourcePoint = aSourcePoints.get(aSourcePoints.size() - 1);
-        addPoint(aResultPoints, sourcePoint);
-        return Pair.create(sourcePoint, sourcePoint);
+
+        int totalDistance = aDistance;
+        if(!(aPoints.isLast() || aPoints.isAfterLast())){
+            LatLng p1 = null;
+            do{
+                if(p1 == null){
+                    p1 = aLastPoint.second;
+                } else{
+                    p1 = aHelper.readLatLng(aPoints);
+                }
+                if( aPoints.moveToNext() ){
+                    LatLng p2 = aHelper.readLatLng(aPoints);
+                    float distance = distance(p1, p2);
+
+                    aPoints.moveToPrevious();
+
+                    if(distance < totalDistance){
+                        totalDistance -= distance; // skip to next points
+                    } else{
+                        LatLng point = calcLngLat(p1, totalDistance, MapsHelper.bearing(p1, p2));
+                        distance = distance(p1, point);
+                        Log.v(TAG, "p1->p2 distance = " + distance);
+                        return Pair.create(p1, point);
+                    }
+                }
+            } while(aPoints.moveToNext());
+        }
+        return Pair.create(aFinalPoint, aFinalPoint);
     }
 
-    public static LatLng calcLngLat(final LatLng aStart, int distance, final float bearing){
+
+    public static LatLng calcLngLat(final LatLng aStart, double distance, final float bearing){
         if(distance == 0){
             return new LatLng(aStart.latitude, aStart.longitude);
         }
@@ -191,10 +161,10 @@ public class MapsHelper{
         double lon1 = aStart.longitude * RADIANS;
         double radbear = bearing * RADIANS;
 
-        lat2 = Math.asin(Math.sin(lat1) * Math.cos((double) distance / R) +
-                                 Math.cos(lat1) * Math.sin((double) distance / R) * Math.cos(radbear));
-        lon2 = lon1 + Math.atan2(Math.sin(radbear) * Math.sin((double) distance / R) * Math.cos(lat1),
-                                 Math.cos((double) distance / R) - Math.sin(lat1) * Math.sin(lat2));
+        lat2 = Math.asin(Math.sin(lat1) * Math.cos(distance / R) +
+                                 Math.cos(lat1) * Math.sin(distance / R) * Math.cos(radbear));
+        lon2 = lon1 + Math.atan2(Math.sin(radbear) * Math.sin(distance / R) * Math.cos(lat1),
+                                 Math.cos(distance / R) - Math.sin(lat1) * Math.sin(lat2));
 
         return new LatLng(lat2 * DEGREES, lon2 * DEGREES);
     }
@@ -235,4 +205,79 @@ public class MapsHelper{
             ex.printStackTrace();
         }
     }
+
+
+/*
+    public static LinkedList<LatLng> getPathPointsForTime(long aTime, final List<LatLng> aPoints){
+        double fullPathMeters = distance(aPoints);
+        int speed = (int) (fullPathMeters / aTime);
+        return getPathPointsForSpeed(speed, aPoints);
+    }
+
+    public static LinkedList<LatLng> getPathPointsForSpeed(final int aSpeedMetersPerSecond, final List<LatLng> aPoints){
+        double fullPathMeters = distance(aPoints);
+        if(aSpeedMetersPerSecond < 1){
+            throw new IllegalArgumentException("Speed must be > 1 m/s");
+        }
+
+        int pointCount = (int) (fullPathMeters / aSpeedMetersPerSecond) + 1;
+        if(pointCount < 2){
+            pointCount = 2;
+        }
+
+        LinkedList<LatLng> points = new LinkedList<LatLng>();
+
+        addPoint(points, aPoints.get(0));
+        if(pointCount == 2){
+            addPoint(points, aPoints.get(aPoints.size() - 1));
+        } else{
+            Pair<LatLng, LatLng> lastPoint = Pair.create(aPoints.get(0), aPoints.get(0));
+            while(lastPoint.first != aPoints.get(aPoints.size() - 1)){
+                lastPoint = nextLatLng(lastPoint, points, aPoints, aSpeedMetersPerSecond);
+            }
+        }
+        return points;
+    }
+
+    private static void addPoint(final LinkedList<LatLng> aPoints, final LatLng aPoint){
+        aPoints.addLast(aPoint);
+        Log.v(TAG, "Added [" + aPoints.size() + "] location: " + aPoint);
+    }
+        private static Pair<LatLng, LatLng> nextLatLng(final Pair<LatLng, LatLng> aLastPoint,
+                                                   final LinkedList<LatLng> aResultPoints,
+                                                   final List<LatLng> aSourcePoints,
+                                                   final int aDistance){
+        int totalDistance = aDistance;
+        int startIndex = -1;
+        for(LatLng l : aSourcePoints){
+            startIndex++;
+            if(l.equals(aLastPoint.first)){
+                break;
+            }
+        }
+        for(int i = startIndex; i < aSourcePoints.size() - 1; i++){
+            LatLng p1;
+            if(i == startIndex){
+                p1 = aLastPoint.second;
+            } else{
+                p1 = aSourcePoints.get(i);
+            }
+            LatLng p2 = aSourcePoints.get(i + 1);
+
+            double distance = distance(p1, p2);
+            if(distance < totalDistance){
+                totalDistance -= distance; // skip to next points
+            } else{
+                LatLng point = calcLngLat(p1, totalDistance, MapsHelper.bearing(p1, p2));
+                addPoint(aResultPoints, point);
+                return Pair.create(aSourcePoints.get(i), point);
+            }
+        }
+        LatLng sourcePoint = aSourcePoints.get(aSourcePoints.size() - 1);
+        addPoint(aResultPoints, sourcePoint);
+        return Pair.create(sourcePoint, sourcePoint);
+    }
+
+*/
+
 }

@@ -3,6 +3,7 @@ package mobi.droid.fakeroad.service;
 import android.app.*;
 import android.content.Context;
 import android.content.Intent;
+import android.database.Cursor;
 import android.location.Location;
 import android.location.LocationManager;
 import android.os.Build;
@@ -19,7 +20,6 @@ import mobi.droid.fakeroad.R;
 import mobi.droid.fakeroad.location.MapsHelper;
 
 import java.lang.reflect.Method;
-import java.util.List;
 import java.util.Random;
 
 public class FakeLocationService extends Service{
@@ -96,8 +96,9 @@ public class FakeLocationService extends Service{
         locationManager.setTestProviderEnabled(LocationManager.GPS_PROVIDER, false);
         locationManager.removeTestProvider(LocationManager.GPS_PROVIDER);
 
-        mHandler.removeCallbacks(mGenerator);
         mMoving = false;
+        mGenerator.stop();
+        mHandler.removeCallbacks(mGenerator);
 
         NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         Notification notification = createNotification(null);
@@ -135,7 +136,7 @@ public class FakeLocationService extends Service{
                                         0);
         locationManager.setTestProviderEnabled(LocationManager.GPS_PROVIDER, true);
 
-        mGenerator = new LocationGenerator(mRouteID, mSpeed, mRandomSpeed);
+        mGenerator = new LocationGenerator(mRouteID, mRandomSpeed);
         mHandler.post(mGenerator);
     }
 
@@ -172,27 +173,32 @@ public class FakeLocationService extends Service{
         return builder.getNotification();
     }
 
-
-
     //
     private class LocationGenerator implements Runnable{
-
-        private List<LatLng> mSourcePoints;
-        private int mRouteID;
-        private int mSpeedLocation;
         private boolean mRandomSpeed;
-        private Pair<LatLng, LatLng> mLastPointPair;
+        private Pair<LatLng, LatLng> mCurrentPoints;
         Random random = new Random();
         private Method mLocationJellyBeanFixMethod;
+        private final LocationDbHelper mDbHelper;
+        private final Cursor mRouteCursor;
+        private LatLng mFinalPoint;
 
-        private LocationGenerator(final int aRouteID, final int aSpeed, final boolean aRandomSpeed){
-            mRouteID = aRouteID;
-            mSpeedLocation = aSpeed;
+        private LocationGenerator(final int aRouteID, final boolean aRandomSpeed){
             mRandomSpeed = aRandomSpeed;
-            LocationDbHelper ldh = new LocationDbHelper(FakeLocationService.this);
-            mSourcePoints = ldh.queryPoints(aRouteID);
+            mDbHelper = new LocationDbHelper(FakeLocationService.this);
+            mRouteCursor = mDbHelper.routeCursor(aRouteID);
 
-            mLastPointPair = Pair.create(mSourcePoints.get(0), mSourcePoints.get(0));
+            if(mRouteCursor == null || !mRouteCursor.moveToLast()){
+                Toast.makeText(FakeLocationService.this, "No route data is available: " + aRouteID,
+                               Toast.LENGTH_LONG).show();
+                stopMoving();
+                return;
+            }
+            mFinalPoint = mDbHelper.readLatLng(mRouteCursor);
+
+            mRouteCursor.moveToFirst();
+            LatLng startLatLng = mDbHelper.readLatLng(mRouteCursor);
+            mCurrentPoints = Pair.create(startLatLng, startLatLng);
 
             try{
                 mLocationJellyBeanFixMethod = Location.class.getMethod("makeComplete");
@@ -205,31 +211,72 @@ public class FakeLocationService extends Service{
             if(!mMoving){
                 return;
             }
-            int currentSpeed;
-
+            int speed;
             if(mRandomSpeed){
-                currentSpeed = (mMinSpeed + (random.nextInt(mSpeedLocation - mMinSpeed) + 1));
+                speed = (mMinSpeed + (random.nextInt(mSpeed - mMinSpeed) + 1));
             } else{
-                currentSpeed = mSpeedLocation;
+                speed = mSpeed;
             }
 
-            mLastPointPair = MapsHelper.nextLatLng(mLastPointPair, mSourcePoints, currentSpeed);
-            LatLng currentPoint = mLastPointPair.second;
+            mCurrentPoints = MapsHelper.nextLatLng(mCurrentPoints,
+                                                   mRouteCursor,
+                                                   mFinalPoint,
+                                                   mDbHelper,
+                                                   speed);
+            LatLng currentPoint = mCurrentPoints.second;
+            // save current point position
+            int position = mRouteCursor.getPosition();
 
-            Pair<LatLng, LatLng> nextPair = MapsHelper.nextLatLng(mLastPointPair, mSourcePoints, currentSpeed);
+            Pair<LatLng, LatLng> nextPair = MapsHelper.nextLatLng(mCurrentPoints,
+                                                                  mRouteCursor,
+                                                                  mFinalPoint,
+                                                                  mDbHelper,
+                                                                  speed);
             LatLng nextPoint = nextPair.second;
+            Log.v("mobi.droid.fakeroad.gen", "curr=" + currentPoint + " next=" + nextPoint + " speed: " + speed);
+            // restore current point position
+            mRouteCursor.moveToPosition(position);
 
-            Log.v("mobi.droid.fakeroad.gen", "curr=" + currentPoint + " next=" + nextPoint + " speed: " + currentSpeed);
+            Location location = fillinLocation(currentPoint, speed, nextPoint);
 
+            String speedInfo = String.format("Speed: %d m/s (%d km/h %d mph)", speed,
+                                             (int) (speed * 3.6),
+                                             (int) (speed * 2.23));
 
+            Notification notification = createNotification(speedInfo);
+            NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            nm.notify(1, notification);
+
+            if(!publishLocation(location) || currentPoint.equals(nextPoint)){
+                stopMoving();
+            } else{
+                mHandler.postDelayed(this, LOCATION_UPDATE_INTERVAL);
+            }
+
+        }
+
+        private boolean publishLocation(final Location aLocation){
+            LocationManager lm = (LocationManager) getSystemService(LOCATION_SERVICE);
+            try{
+                lm.setTestProviderLocation(LocationManager.GPS_PROVIDER, aLocation);
+            } catch(Exception e){
+                e.printStackTrace();
+                Toast.makeText(FakeLocationService.this, "Stopped movement: " + e.getMessage(),
+                               Toast.LENGTH_LONG).show();
+                return false;
+            }
+            return true;
+        }
+
+        private Location fillinLocation(final LatLng aCurrentPoint, final int aSpeed, final LatLng aNextPoint){
             Location location = new Location(LocationManager.GPS_PROVIDER);
-            location.setLatitude(currentPoint.latitude);
-            location.setLongitude(currentPoint.longitude);
+            location.setLatitude(aCurrentPoint.latitude);
+            location.setLongitude(aCurrentPoint.longitude);
             location.setAccuracy(0.0f);
 
-            location.setSpeed(currentSpeed);
-            if(!currentPoint.equals(nextPoint)){
-                location.setBearing(MapsHelper.bearing(currentPoint, nextPoint));
+            location.setSpeed(aSpeed);
+            if(!aCurrentPoint.equals(aNextPoint)){
+                location.setBearing(MapsHelper.bearing(aCurrentPoint, aNextPoint));
             }
 
             location.setTime(System.currentTimeMillis());
@@ -243,32 +290,17 @@ public class FakeLocationService extends Service{
                 }
             } catch(Exception ignored){
             }
+            return location;
+        }
 
-            String speedInfo = String.format("Speed: %d m/s (%d km/h %d mph)", currentSpeed,
-                                             (int) (currentSpeed * 3.6),
-                                             (int) (currentSpeed * 2.23));
-
-            Notification notification = createNotification(speedInfo);
-            NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-            nm.notify(1, notification);
-
-            LocationManager lm = (LocationManager) getSystemService(LOCATION_SERVICE);
+        public void stop(){
+            if(mRouteCursor != null){
+                mRouteCursor.close();
+            }
             try{
-                lm.setTestProviderLocation(LocationManager.GPS_PROVIDER, location);
-            } catch(Exception e){
-                Toast.makeText(FakeLocationService.this, "Stopped movement: " + e.getMessage(),
-                               Toast.LENGTH_LONG).show();
-                e.printStackTrace();
-                stopMoving();
-                return;
+                mDbHelper.close();
+            } catch(Exception ignored){
             }
-
-            if(currentPoint.equals(nextPoint)){
-                stopMoving();
-            } else{
-                mHandler.postDelayed(this, LOCATION_UPDATE_INTERVAL);
-            }
-
         }
     }
 }

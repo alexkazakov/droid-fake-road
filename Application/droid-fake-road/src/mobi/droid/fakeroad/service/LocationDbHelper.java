@@ -53,22 +53,6 @@ public class LocationDbHelper extends SQLiteOpenHelper{
         return routeID + 1;
     }
 
-    public int queryMaxPointsOrder(final int aRouteID){
-        SQLiteDatabase readableDatabase = getReadableDatabase();
-        if(readableDatabase == null){
-            return 0;
-        }
-        int maxOrder = 0;
-        Cursor cursor;
-        cursor = readableDatabase.rawQuery("Select MAX(order) from routes where = route_id = ? ",
-                                           new String[]{String.valueOf(aRouteID)});
-        if(cursor.moveToFirst()){
-            maxOrder = cursor.getInt(0);
-        }
-        cursor.close();
-        return maxOrder;
-    }
-
     public List<LatLng> queryPoints(final int aRouteID){
         SQLiteDatabase readableDatabase = getReadableDatabase();
         if(readableDatabase == null){
@@ -90,22 +74,20 @@ public class LocationDbHelper extends SQLiteOpenHelper{
         return list;
     }
 
-    public LatLng queryNextPoints(final int aRouteID, final int aOrder){
+    public Cursor routeCursor(final int aRouteID){
         SQLiteDatabase readableDatabase = getReadableDatabase();
         if(readableDatabase == null){
             return null;
         }
-        double lat = 0;
-        double lng = 0;
-        Cursor cursor;
-        cursor = readableDatabase.query("routes", null, "route_id = ? and ordinal =?",
-                                        new String[]{String.valueOf(aRouteID), String.valueOf(aOrder)}, null, null,
-                                        null);
-        if(cursor.moveToFirst()){
-            lat = cursor.getDouble(cursor.getColumnIndex("lat"));
-            lng = cursor.getDouble(cursor.getColumnIndex("lng"));
-        }
-        cursor.close();
+        return readableDatabase.query("routes", null,
+                                      "route_id = " + aRouteID,
+                                      null, null, null,
+                                      "ordinal");
+    }
+
+    public LatLng readLatLng(Cursor aCursor){
+        double lat = aCursor.getDouble(aCursor.getColumnIndex("lat"));
+        double lng = aCursor.getDouble(aCursor.getColumnIndex("lng"));
         return new LatLng(lat, lng);
     }
 
@@ -123,8 +105,7 @@ public class LocationDbHelper extends SQLiteOpenHelper{
                 contentValues.put("lat", latLng.latitude);
                 contentValues.put("lng", latLng.longitude);
                 contentValues.put("ordinal", i);
-                long rowID;
-                rowID = writableDatabase.insert("routes", null, contentValues);
+                long rowID = writableDatabase.insert("routes", null, contentValues);
             }
             writableDatabase.setTransactionSuccessful();
         } finally{
