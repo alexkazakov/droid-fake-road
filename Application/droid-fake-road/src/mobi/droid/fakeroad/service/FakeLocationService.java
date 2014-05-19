@@ -3,7 +3,6 @@ package mobi.droid.fakeroad.service;
 import android.app.*;
 import android.content.Context;
 import android.content.Intent;
-import android.graphics.drawable.Drawable;
 import android.location.Location;
 import android.location.LocationManager;
 import android.os.Build;
@@ -184,6 +183,7 @@ public class FakeLocationService extends Service{
         private boolean mRandomSpeed;
         private Pair<LatLng, LatLng> mLastPointPair;
         Random random = new Random();
+        private Method mLocationJellyBeanFixMethod;
 
         private LocationGenerator(final int aRouteID, final int aSpeed, final boolean aRandomSpeed){
             mRouteID = aRouteID;
@@ -193,6 +193,11 @@ public class FakeLocationService extends Service{
             mSourcePoints = ldh.queryPoints(aRouteID);
 
             mLastPointPair = Pair.create(mSourcePoints.get(0), mSourcePoints.get(0));
+
+            try{
+                mLocationJellyBeanFixMethod = Location.class.getMethod("makeComplete");
+            } catch(NoSuchMethodException ignored){
+            }
         }
 
         @Override
@@ -233,12 +238,10 @@ public class FakeLocationService extends Service{
             }
 
             try{ // trick to initialize all last fields with default values
-                Method locationJellyBeanFixMethod = Location.class.getMethod("makeComplete");
-                if(locationJellyBeanFixMethod != null){
-                    locationJellyBeanFixMethod.invoke(location);
+                if(mLocationJellyBeanFixMethod != null){
+                    mLocationJellyBeanFixMethod.invoke(location);
                 }
-            } catch(Exception e){
-                e.printStackTrace();
+            } catch(Exception ignored){
             }
 
             String speedInfo = String.format("Speed: %d m/s (%d km/h %d mph)", currentSpeed,
