@@ -2,6 +2,7 @@ package mobi.droid.fakeroad.ui.activity;
 
 import android.app.*;
 import android.content.DialogInterface;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.Color;
@@ -327,6 +328,9 @@ public class MainActivity extends BaseMapViewActivity implements LocationListene
             case R.id.direction_transit:
                 changeRoutingMode(item, Routing.TravelMode.TRANSIT);
                 return true;
+            case R.id.action_app_preferences:
+                startActivity(new Intent(this, PreferencesActivity.class));
+                return true;
 
         }
         return super.onOptionsItemSelected(item);
@@ -447,7 +451,7 @@ public class MainActivity extends BaseMapViewActivity implements LocationListene
                 locationDbHelper.writeLatLng(routeID, mPoints);
 
                 FakeLocationService.start(MainActivity.this, mSpeed, seekBarMin.getValue(), -1, routeID,
-                                          ch.isChecked(), 1000);
+                                          ch.isChecked());
             }
         });
         ab.setNegativeButton(android.R.string.cancel, new DialogInterface.OnClickListener(){
@@ -512,7 +516,7 @@ public class MainActivity extends BaseMapViewActivity implements LocationListene
 
     @Override
     public void onLocationChanged(final Location location){
-        if(location != null && FakeLocationService.isFakeRunning(this)){
+        if(location != null && FakeLocationService.isRunning(this)){
             if(!moveMarker.isVisible()){
                 moveMarker.visible(true);
             }

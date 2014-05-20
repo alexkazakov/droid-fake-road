@@ -7,7 +7,6 @@ import android.content.Intent;
 import android.database.Cursor;
 import android.location.Location;
 import android.provider.Settings;
-import android.util.Log;
 import android.util.Pair;
 import com.directions.route.Routing;
 import com.directions.route.RoutingListener;
@@ -134,8 +133,8 @@ public class MapsHelper{
                         totalDistance -= distance; // skip to next points
                     } else{
                         LatLng point = calcLngLat(p1, totalDistance, MapsHelper.bearing(p1, p2));
-                        distance = distance(p1, point);
-                        Log.v(TAG, "p1->p2 distance = " + distance);
+//                        distance = distance(p1, point);
+//                        Log.v(TAG, "p1->p2 distance = " + distance);
                         return Pair.create(p1, point);
                     }
                 }
