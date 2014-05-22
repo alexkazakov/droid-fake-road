@@ -46,11 +46,13 @@
     <item
             android:id="@+id/action_start_route"
             android:title="Start"
+            android:icon="@android:drawable/ic_media_play"
             android:showAsAction="always"/>
 
     <item
             android:id="@+id/action_stop_route"
             android:title="Stop"
+            android:icon="@android:drawable/ic_media_pause"
             android:showAsAction="collapseActionView"/>
 
     <item
