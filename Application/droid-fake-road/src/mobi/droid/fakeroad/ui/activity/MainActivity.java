@@ -28,6 +28,7 @@ import mobi.droid.fakeroad.location.MapsHelper;
 import mobi.droid.fakeroad.service.FakeLocationService;
 import mobi.droid.fakeroad.service.LocationDbHelper;
 import mobi.droid.fakeroad.ui.view.AutoCompleteAddressTextView;
+import mobi.droid.widget.SpeedPicker;
 
 import java.util.*;
 
@@ -402,6 +403,8 @@ public class MainActivity extends BaseMapViewActivity implements LocationListene
     }
 
     private void showSpeedDialog(){
+
+
         mSpeed = 10;
         AlertDialog.Builder ab = new AlertDialog.Builder(this);
         ab.setTitle("Set speed");
@@ -431,7 +434,7 @@ public class MainActivity extends BaseMapViewActivity implements LocationListene
         l.addView(ch);
 
 
-        ab.setView(l);
+        ab.setView( new SpeedPicker(this));
 
 
 
